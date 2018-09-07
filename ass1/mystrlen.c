@@ -5,10 +5,10 @@ int mystrlen(char *input_string) {
 	int length = 0;
 	char *char_pointer = input_string;
 
-    for (char_pointer; *char_pointer!='\0';char_pointer++){
-        length++;
-    }
-    return length;
+	for (char_pointer; *char_pointer!='\0';char_pointer++){
+		length++;
+	}
+	return length;
 }
 
 int main(int argc, char **argv) {
