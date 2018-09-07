@@ -8,7 +8,6 @@
 typedef struct node{
     char buffer[MAX_BUFFER_SIZE];
     int bytes_read;
-    //struct node* next;
     struct node* previous;
 } node_t;
 
@@ -67,14 +66,12 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-
     tail = recursive_read_bytes(input_filedesc, NULL);
 
     if(close(input_filedesc) < 0){
         perror("Input File ERROR:");
         return 1;
     }
-
     recursive_print_bytes_reversed(tail);
     return 0;
 }
