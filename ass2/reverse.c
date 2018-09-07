@@ -12,43 +12,46 @@ typedef struct node{
 } node_t;
 
 
-node_t* recursive_read_bytes(int fd,node_t* previous_buffer){
-    //create new node
-    node_t *current_buffer = malloc(sizeof(node_t));
-    if (current_buffer == NULL) {
-        perror("Out of memory!");
-        exit(1);
-    }
-    current_buffer->previous = previous_buffer;
-    //read bytes to the buffer of the current node and store the amount of bytes read
-    current_buffer->bytes_read = read(fd,current_buffer->buffer,MAX_BUFFER_SIZE);
-    if(current_buffer->bytes_read < MAX_BUFFER_SIZE){
-        if(current_buffer->bytes_read<0){
-            perror("Input File READ error");
+node_t* read_bytes(int fd,node_t* previous_node){
+    node_t *current_node;
+    do {
+        //create new node
+        current_node = malloc(sizeof(node_t));
+        if (current_node == NULL) {
+            perror("Out of memory!");
             exit(1);
         }
-        return current_buffer;
-    }
-    return recursive_read_bytes(fd,current_buffer);
-}
-
-void recursive_print_bytes_reversed(node_t* current_buffer){
-    char reversed[current_buffer->bytes_read];
-    int i;
-    //reverse the byte buffer in the node
-    for (i = 0; i < current_buffer->bytes_read; ++i) {
-        reversed[i] = current_buffer->buffer[current_buffer->bytes_read-1-i];
-    }
-    //print it to stdout
-    if(write(STDOUT_FD,reversed,current_buffer->bytes_read)!= current_buffer->bytes_read){
-        perror("Error printing reversed bytes");
+        current_node->previous = previous_node;
+        //read bytes to the buffer of the current node and store the amount of bytes read
+        current_node->bytes_read = read(fd, current_node->buffer, MAX_BUFFER_SIZE);
+        previous_node = current_node;
+    }while (current_node->bytes_read == MAX_BUFFER_SIZE);
+    if(current_node->bytes_read<0){
+        perror("Input File READ error");
         exit(1);
     }
-    node_t *previous_node = current_buffer->previous;
-    free(current_buffer);
-    if(previous_node!=NULL){
-        recursive_print_bytes_reversed(previous_node);
-    }
+    return current_node;
+}
+
+void print_bytes_reversed(node_t* current_node){
+    int i;
+    node_t *previous_node;
+    char reversed[MAX_BUFFER_SIZE];
+
+    do {
+        //reverse the byte buffer in the node
+        for (i = 0; i < current_node->bytes_read; ++i) {
+            reversed[i] = current_node->buffer[current_node->bytes_read - 1 - i];
+        }
+        //print it to stdout
+        if (write(STDOUT_FD, reversed, current_node->bytes_read) != current_node->bytes_read) {
+            perror("Error printing reversed bytes");
+            exit(1);
+        }
+        previous_node = current_node->previous;
+        free(current_node);
+        current_node = previous_node;
+    }while (previous_node !=NULL);
 }
 
 int main(int argc, char **argv) {
@@ -66,12 +69,12 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    tail = recursive_read_bytes(input_filedesc, NULL);
+    tail = read_bytes(input_filedesc, NULL);
 
     if(close(input_filedesc) < 0){
         perror("Input File ERROR:");
         return 1;
     }
-    recursive_print_bytes_reversed(tail);
+    print_bytes_reversed(tail);
     return 0;
 }
