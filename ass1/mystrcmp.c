@@ -4,7 +4,7 @@ int mystrcmp(char *strptr1, char *strptr2) {
 	char *string1 = strptr1;
 	char *string2 = strptr2;
 	int identical = 1;
-	
+
 	while (identical == 1){
 		if(*string1 != *string2){
 			identical = 0;
