@@ -55,7 +55,7 @@ void print_bytes_reversed(node_t* current_node){
 }
 
 int main(int argc, char **argv) {
-    int input_filedesc;
+    int input_filedesc,input_file_close_status;
     node_t *tail;
 
     if (argc != 2) {
@@ -71,7 +71,8 @@ int main(int argc, char **argv) {
 
     tail = read_bytes(input_filedesc, NULL);
 
-    if(close(input_filedesc) < 0){
+    input_file_close_status = close(input_filedesc);
+    if(input_file_close_status < 0){
         perror("Input File ERROR:");
         return 1;
     }
