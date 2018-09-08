@@ -35,7 +35,7 @@ int setup_socket(int port){
 
 
 int main(){
-    int fd, msg_length,sent_length;
+    int fd, msg_length,sent_length, counter;
     char buff[BUFFER_SIZE];
     struct sockaddr_in from;
     socklen_t from_len;
@@ -44,16 +44,22 @@ int main(){
 
     from_len = sizeof(from);
     printf("LISTENING ON PORT %d\n",DEFAULT_PORT);
-
+    counter = 1;
     while(1){
         msg_length =  recvfrom(fd, &buff, BUFFER_SIZE, 0,(struct sockaddr *) &from, &from_len);
         if(msg_length<0){
             perror("Error retrieving bytes from UDP packet");
             exit(1);
         }
-        printf("Received %d bytes from host %s port %d: %s\n", msg_length, inet_ntoa(from.sin_addr), ntohs(from.sin_port), buff);
+        counter++;
+        if(counter%2==0){
+            printf("Received %d bytes from host %s port %d: %s\n", msg_length, inet_ntoa(from.sin_addr), ntohs(from.sin_port), buff);
+        }else{
+            printf("DROPPING PACKET OF %d bytes from host %s port %d: %s\n", msg_length, inet_ntoa(from.sin_addr), ntohs(from.sin_port), buff);
+            continue;
+        }
         sent_length = sendto(fd, buff, msg_length, 0,(
-                struct sockaddr *) &from, from_len);
+        struct sockaddr *) &from, from_len);
 
         if(sent_length!=msg_length){
             perror("Did not sent the same amount of bytes as received");
