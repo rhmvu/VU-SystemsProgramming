@@ -51,7 +51,7 @@ int main(){
             perror("Error retrieving bytes from UDP packet");
             exit(1);
         }
-        printf("Received %d bytes from host %s port %d: %s", msg_length, inet_ntoa(from.sin_addr), ntohs(from.sin_port), buff);
+        printf("Received %d bytes from host %s port %d: %s\n", msg_length, inet_ntoa(from.sin_addr), ntohs(from.sin_port), buff);
         sent_length = sendto(fd, buff, msg_length, 0,(
         struct sockaddr *) &from, from_len);
 
