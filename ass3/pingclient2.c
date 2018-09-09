@@ -12,37 +12,14 @@
 #include <time.h>
 #include <string.h>
 #include <sys/select.h>
+
+#include "pingclient1.h"
 #define DEFAULT_PORT 2012
 #define BUFFER_SIZE 18
 #define NANO_OFFSET 1000000000
 
 
-
-int setup_socket(){
-    int fd;
-    fd = socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
-    if (fd<0) {
-        perror("Couln't create socket");
-        exit(1);
-    }
-    return fd;
-}
-
-
-struct in_addr* get_ip(const char *name) {
-    struct hostent *resolv;
-    struct in_addr *addrp = malloc(sizeof(struct in_addr));
-    resolv = gethostbyname(name);
-    if (resolv==NULL) {
-        perror("Address not found\n");
-        exit(1);
-    }
-    addrp = (struct in_addr*) resolv->h_addr_list[0];
-    return addrp;
-
-}
-
-int handle_reply(int fd, int sent_length, char *buff){
+int handle_reply_with_timeout(int fd, int sent_length, char *buff){
     struct sockaddr_in from;
     socklen_t from_len;
     struct timeval timeout;
@@ -78,38 +55,6 @@ int handle_reply(int fd, int sent_length, char *buff){
 }
 
 
-
-int send_packet(int fd,struct sockaddr_in to, struct in_addr *ip,char *buff){
-    int msg_length,sent_length;
-    socklen_t to_len;
-
-    to_len = sizeof(to);
-
-    msg_length = sizeof(char)*strlen(buff)+1;
-
-    //send the packet
-    sent_length = sendto(fd, buff, msg_length, 0,(
-            struct sockaddr *) &to, to_len);
-
-    if(sent_length!=msg_length){
-        perror("Error sending bytes");
-        exit(1);
-    }
-    return sent_length;
-}
-
-
-double get_current_secs(clockid_t clock){
-    struct timespec time;
-    int time_status;
-    time_status = clock_gettime(clock,&time);
-
-    if(time_status<0){
-        perror("Error getting time");
-        exit(1);
-    }
-    return (double) time.tv_nsec/NANO_OFFSET;
-}
 
 void print_status(int reply_status,double start_time, double end_time){
     if(reply_status) {
@@ -147,7 +92,7 @@ int main(int argc,char **argv){
     sent_bytes = send_packet(fd,to,ip,buff);
     start_time = get_current_secs(clock);
 
-    reply_status = handle_reply(fd,sent_bytes,buff);
+    reply_status = handle_reply_with_timeout(fd,sent_bytes,buff);
     end_time = get_current_secs(clock);
 
     close_status = close(fd);
