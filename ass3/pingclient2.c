@@ -6,6 +6,7 @@
 //
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -124,7 +125,7 @@ void print_status(int reply_status,double start_time, double end_time){
 
 int main(int argc,char **argv){
     char buff[BUFFER_SIZE] = "Random message123";
-    int fd, sent_bytes, reply_status;
+    int fd, sent_bytes, reply_status,close_status;
     double start_time,end_time;
     struct sockaddr_in to;
     struct in_addr *ip;
@@ -151,6 +152,12 @@ int main(int argc,char **argv){
 
     reply_status = handle_reply(fd,sent_bytes,buff);
     end_time = get_current_secs(clock);
+
+    close_status = close(fd);
+    if(close_status<0){
+        perror("Error closing socket");
+        return 1;
+    }
 
     print_status(reply_status,start_time,end_time);
 }

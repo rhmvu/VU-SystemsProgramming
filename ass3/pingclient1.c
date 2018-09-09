@@ -3,6 +3,7 @@
 //
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -89,7 +90,7 @@ double get_current_secs(clockid_t clock){
 
 int main(int argc,char **argv){
     char buff[BUFFER_SIZE] = "Random message123";
-    int fd, sent_bytes;
+    int fd, sent_bytes,close_status;
     double start_time,end_time;
     struct sockaddr_in to;
     struct in_addr *ip;
@@ -116,6 +117,12 @@ int main(int argc,char **argv){
 
     handle_reply(fd,sent_bytes,buff);
     end_time = get_current_secs(clock);
+
+    close_status = close(fd);
+    if(close_status<0){
+        perror("Error closing socket");
+        return 1;
+    }
 
     printf("The RTT was: %f seconds.\n", (double) (end_time - start_time));
 }
