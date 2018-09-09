@@ -1,9 +1,6 @@
 //
 // Created by ruben on 8-9-18.
 //
-//
-// Created by ruben on 8-9-18.
-//
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
