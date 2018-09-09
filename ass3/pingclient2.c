@@ -81,8 +81,11 @@ int handle_reply(int fd, int sent_length, char *buff){
 
 
 
-int send_packet(int fd,struct sockaddr_in to,socklen_t to_len, struct in_addr *ip,char *buff){
+int send_packet(int fd,struct sockaddr_in to, struct in_addr *ip,char *buff){
     int msg_length,sent_length;
+    socklen_t to_len;
+
+    to_len = sizeof(to);
 
     msg_length = sizeof(char)*strlen(buff)+1;
 
@@ -124,7 +127,6 @@ int main(int argc,char **argv){
     int fd, sent_bytes, reply_status;
     double start_time,end_time;
     struct sockaddr_in to;
-    socklen_t to_len;
     struct in_addr *ip;
     clockid_t clock;
 
@@ -142,10 +144,9 @@ int main(int argc,char **argv){
     to.sin_addr = *ip;
     free(ip);
 
-    to_len = sizeof(to);
     clock = CLOCK_PROCESS_CPUTIME_ID;
 
-    sent_bytes = send_packet(fd,to,to_len,ip,buff);
+    sent_bytes = send_packet(fd,to,ip,buff);
     start_time = get_current_secs(clock);
 
     reply_status = handle_reply(fd,sent_bytes,buff);

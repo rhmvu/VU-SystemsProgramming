@@ -10,6 +10,7 @@
 #include <netdb.h>
 #include <time.h>
 #include <string.h>
+#include <sys/select.h>
 #define DEFAULT_PORT 2012
 #define BUFFER_SIZE 18
 #define NANO_OFFSET 1000000000
@@ -37,55 +38,60 @@ struct in_addr* get_ip(const char *name) {
     }
     addrp = (struct in_addr*) resolv->h_addr_list[0];
     return addrp;
-
 }
 
-void send_packet(int fd,struct sockaddr_in to,socklen_t to_len, struct in_addr *ip,clockid_t clock){
-    int msg_length,sent_length,received_length, time_status;
-    char buff[BUFFER_SIZE] = "Random message123";
-
+void handle_reply(int fd, int sent_length, char *buff){
     struct sockaddr_in from;
     socklen_t from_len;
-    struct timespec time;
-    double start_time,end_time;
+    int received_length;
+    from_len = sizeof(from);
+
+    received_length = recvfrom(fd, buff, sent_length, 0, (struct sockaddr *) &from, &from_len);
+    if (received_length < 0) {
+        perror("Error retrieving bytes from UDP packet");
+        exit(1);
+    }
+}
+
+
+
+int send_packet(int fd,struct sockaddr_in to, struct in_addr *ip,char *buff){
+    int msg_length,sent_length;
+    socklen_t to_len;
+    to_len = sizeof(to);
 
     msg_length = sizeof(char)*strlen(buff)+1;
 
-    //sent packet
+    //send the packet
     sent_length = sendto(fd, buff, msg_length, 0,(
             struct sockaddr *) &to, to_len);
-    time_status = clock_gettime(clock,&time);
-    if(time_status<0){
-        perror("Error getting time after sent packet");
-        exit(1);
-    }
-    start_time = (double) time.tv_nsec/NANO_OFFSET;
 
     if(sent_length!=msg_length){
         perror("Error sending bytes");
         exit(1);
     }
-    //recieve packet
-    received_length =  recvfrom(fd, buff, sent_length, 0,(struct sockaddr *) &from, &from_len);
+    return sent_length;
+}
+
+
+double get_current_secs(clockid_t clock){
+    struct timespec time;
+    int time_status;
     time_status = clock_gettime(clock,&time);
+
     if(time_status<0){
-        perror("Error getting time after received packet");
+        perror("Error getting time");
         exit(1);
     }
-    if(received_length < 0){
-        perror("Error retrieving bytes from UDP packet");
-        exit(1);
-    }
-    //calculate RTT
-    end_time = (double) time.tv_nsec/NANO_OFFSET;
-    printf("The RTT was: %f seconds.\n", (double) (end_time-start_time));
+    return (double) time.tv_nsec/NANO_OFFSET;
 }
 
 
 int main(int argc,char **argv){
-    int fd;
+    char buff[BUFFER_SIZE] = "Random message123";
+    int fd, sent_bytes;
+    double start_time,end_time;
     struct sockaddr_in to;
-    socklen_t to_len;
     struct in_addr *ip;
     clockid_t clock;
 
@@ -103,9 +109,13 @@ int main(int argc,char **argv){
     to.sin_addr = *ip;
     free(ip);
 
-    to_len = sizeof(to);
     clock = CLOCK_PROCESS_CPUTIME_ID;
 
+    sent_bytes = send_packet(fd,to,ip,buff);
+    start_time = get_current_secs(clock);
 
-    send_packet(fd,to,to_len,ip,clock);
+    handle_reply(fd,sent_bytes,buff);
+    end_time = get_current_secs(clock);
+
+    printf("The RTT was: %f seconds.\n", (double) (end_time - start_time));
 }
