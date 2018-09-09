@@ -44,37 +44,17 @@ struct in_addr* get_ip(const char *name) {
 
 }
 
-void send_packet(int fd,struct sockaddr_in to,socklen_t to_len, struct in_addr *ip,clockid_t clock){
-    int msg_length,sent_length,received_length, time_status,sel;
-    char buff[BUFFER_SIZE] = "Random message123";
-
+int handle_reply(int fd, int sent_length, char *buff){
     struct sockaddr_in from;
     socklen_t from_len;
-    struct timespec time;
     struct timeval timeout;
     fd_set read_set;
-    double start_time,end_time;
-
+    int sel,received_length;
     FD_ZERO(&read_set);
     FD_SET(fd, &read_set);
     timeout.tv_sec = 0;
     timeout.tv_usec = 500000;
-    msg_length = sizeof(char)*strlen(buff)+1;
-
-    //send the packet
-    sent_length = sendto(fd, buff, msg_length, 0,(
-            struct sockaddr *) &to, to_len);
-    time_status = clock_gettime(clock,&time);
-    if(time_status<0){
-        perror("Error getting time after sent packet");
-        exit(1);
-    }
-    start_time = (double) time.tv_nsec/NANO_OFFSET;
-
-    if(sent_length!=msg_length){
-        perror("Error sending bytes");
-        exit(1);
-    }
+    from_len = sizeof(from);
 
     //wait for the reply (until reply or timeout)
     sel = select(fd+1, &read_set, NULL, NULL, &timeout);
@@ -83,30 +63,66 @@ void send_packet(int fd,struct sockaddr_in to,socklen_t to_len, struct in_addr *
         exit(1);
     }
     if (sel==0) {
-        printf("The packet was lost.\n");
-        return;
+        return 0;
     }
 
     if (FD_ISSET(fd,&read_set)) {
         received_length = recvfrom(fd, buff, sent_length, 0, (struct sockaddr *) &from, &from_len);
-
-        time_status = clock_gettime(clock, &time);
-        if (time_status < 0) {
-            perror("Error getting time after received packet");
-            exit(1);
-        }
         if (received_length < 0) {
             perror("Error retrieving bytes from UDP packet");
             exit(1);
         }
-        end_time = (double) time.tv_nsec / NANO_OFFSET;
+    }else{
+        perror("File descriptor is not set as readable, though no timeout occurred");
+        exit(1);
+    }
+    return 1;
+}
+
+
+
+int send_packet(int fd,struct sockaddr_in to,socklen_t to_len, struct in_addr *ip,char *buff){
+    int msg_length,sent_length;
+
+    msg_length = sizeof(char)*strlen(buff)+1;
+
+    //send the packet
+    sent_length = sendto(fd, buff, msg_length, 0,(
+            struct sockaddr *) &to, to_len);
+
+    if(sent_length!=msg_length){
+        perror("Error sending bytes");
+        exit(1);
+    }
+    return sent_length;
+}
+
+
+double get_current_secs(clockid_t clock){
+    struct timespec time;
+    int time_status;
+    time_status = clock_gettime(clock,&time);
+
+    if(time_status<0){
+        perror("Error getting time");
+        exit(1);
+    }
+    return (double) time.tv_nsec/NANO_OFFSET;
+}
+
+void print_status(int reply_status,double start_time, double end_time){
+    if(reply_status) {
         printf("The RTT was: %f seconds.\n", (double) (end_time - start_time));
+    }else{
+        printf("The packet was lost.\n");
     }
 }
 
 
 int main(int argc,char **argv){
-    int fd;
+    char buff[BUFFER_SIZE] = "Random message123";
+    int fd, sent_bytes, reply_status;
+    double start_time,end_time;
     struct sockaddr_in to;
     socklen_t to_len;
     struct in_addr *ip;
@@ -129,5 +145,11 @@ int main(int argc,char **argv){
     to_len = sizeof(to);
     clock = CLOCK_PROCESS_CPUTIME_ID;
 
-    send_packet(fd,to,to_len,ip,clock);
+    sent_bytes = send_packet(fd,to,to_len,ip,buff);
+    start_time = get_current_secs(clock);
+
+    reply_status = handle_reply(fd,sent_bytes,buff);
+    end_time = get_current_secs(clock);
+
+    print_status(reply_status,start_time,end_time);
 }
