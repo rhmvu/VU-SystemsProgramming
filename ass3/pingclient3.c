@@ -4,24 +4,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
 #include <time.h>
-#include <string.h>
-#include <sys/select.h>
-#include "pingclient1.h";
-#include "pingclient2.h";
+#include "pingutils.h"
+#include "pingutils2.h"
 
-#define DEFAULT_PORT 2012
 #define BUFFER_SIZE 64
-#define NANO_OFFSET 1000000000
 
 
 
-void print_status(int reply_status,int reply_count,unsigned int count,double start_time, double end_time){
+void print_status_with_counter(int reply_status,int reply_count,unsigned int count,double start_time, double end_time){
     if(reply_status == 0) {
         printf("Packet %u: lost.\n",count);
     }
@@ -36,7 +27,7 @@ void print_status(int reply_status,int reply_count,unsigned int count,double sta
 
 int main(int argc,char **argv){
     char *buff;
-    int fd, sent_bytes, reply_status,buffer_status,reply_count;
+    int fd, sent_bytes, reply_status,buffer_status,reply_count, scan_status;
     unsigned int count;
     double start_time,end_time;
     struct sockaddr_in to;
@@ -79,7 +70,7 @@ int main(int argc,char **argv){
         }
         end_time = get_current_secs(clock);
 
-        print_status(reply_status,reply_count,count,start_time,end_time);
+        print_status_with_counter(reply_status,reply_count,count,start_time,end_time);
         count++;
         sleep(1);
     }
