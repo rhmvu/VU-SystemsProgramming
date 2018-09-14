@@ -1,15 +1,11 @@
-all:
-	make pingclient1;\
-	make pingclient2;\
-	make pingclient3;\
-	make pingserver;\
+all: pingclient1 pingclient2 pingclient3 pingserver
 
 pingclient1: pingclient1.o libpingutils.so
-	gcc -o pingclient1 pingclient1.o -L. -lpingutils
+	gcc -o pingclient1 pingclient1.o -Wl,-rpath=$(shell pwd) -L./ -lpingutils
 pingclient2: pingclient2.o libpingutils.so
-	gcc -o pingclient2 pingclient2.o -L. -lpingutils
+	gcc -o pingclient2 pingclient2.o -Wl,-rpath=$(shell pwd) -L./ -lpingutils
 pingclient3: pingclient3.o libpingutils.so
-	gcc -o pingclient3 pingclient3.o -L. -lpingutils
+	gcc -o pingclient3 pingclient3.o -Wl,-rpath=$(shell pwd) -L./ -lpingutils
 pingserver: pingserver.c
 	gcc -Wall -O -o pingserver pingserver.c
 
@@ -28,11 +24,16 @@ pingutils2.o:  pingutils2.c pingutils2.h
 
 
 libpingutils.so: pingutils.o pingutils2.o
-	gcc -shared -o libpingutils.so pingutils.o pingutils2.o &&\
-	export LD_LIBRARY_PATH=$PWD
+	gcc -shared -o libpingutils.so pingutils.o pingutils2.o
+	export LD_LIBRARY_PATH=$(shell pwd)
+
 depend:
 	makedepend pingclient1.c pingclient2.c pingclient3.c pingutils.c pingutils2.c pingserver.c
 
 clean:
 	rm -rf *.o
 	rm -rf *.so
+	rm -rf pingserver
+	rm -rf pingclient1
+	rm -rf pingclient2
+	rm -rf pingclient3
