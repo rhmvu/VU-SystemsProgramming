@@ -12,7 +12,6 @@
 #include <time.h>
 #include <string.h>
 #include <sys/select.h>
-
 #include "pingutils.h"
 
 const int DEFAULT_PORT = 2012;
@@ -31,13 +30,15 @@ int setup_socket(){
 
 struct in_addr* get_ip(const char *name) {
     struct hostent *resolv;
-    struct in_addr *addrp = malloc(sizeof(struct in_addr));
+    struct in_addr *addrp = (struct in_addr*) malloc(sizeof(struct in_addr));
     resolv = gethostbyname(name);
     if (resolv==NULL) {
         perror("Address not found\n");
         exit(1);
     }
-    addrp = (struct in_addr*) resolv->h_addr_list[0];
+    memcpy(addrp,resolv->h_addr_list[0], sizeof(struct in_addr));
+    //addrp = (struct in_addr*) resolv->h_addr_list[0];
+    //free(resolv);
     return addrp;
 }
 

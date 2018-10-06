@@ -7,10 +7,7 @@
 #include <time.h>
 #include "pingutils.h"
 #include "pingutils2.h"
-
-#include "pingutils.h"
-#include "pingutils2.h"
-#define BUFFER_SIZE 18
+#define BUFFER_SIZE 64
 
 
 

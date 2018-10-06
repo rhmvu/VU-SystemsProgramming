@@ -12,9 +12,6 @@
 #include <time.h>
 #include <string.h>
 #include <sys/select.h>
-
-
-
 #include "pingutils2.h"
 
 

@@ -32,8 +32,6 @@ int setup_socket(int port){
     return fd;
 }
 
-
-
 int main(){
     int fd, msg_length,sent_length;
     char buff[BUFFER_SIZE];
