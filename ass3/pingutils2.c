@@ -24,7 +24,7 @@ int handle_reply_with_timeout(int fd, int sent_length, char *buff){
     FD_ZERO(&read_set);
     FD_SET(fd, &read_set);
     timeout.tv_sec = 0;
-    timeout.tv_usec = 500000; //timeout 0.5 seconds
+    timeout.tv_usec = 1000000; //timeout 1 second
     from_len = sizeof(from);
 
     //wait for the reply (until reply or timeout)
