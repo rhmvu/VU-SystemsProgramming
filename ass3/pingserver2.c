@@ -58,8 +58,7 @@ int main(){
             printf("DROPPING PACKET OF %d bytes from host %s port %d: %s\n", msg_length, inet_ntoa(from.sin_addr), ntohs(from.sin_port), buff);
             continue;
         }
-        sent_length = sendto(fd, buff, msg_length, 0,(
-        struct sockaddr *) &from, from_len);
+        sent_length = sendto(fd, buff, msg_length, 0, (struct sockaddr *) &from, from_len);
 
         if(sent_length!=msg_length){
             perror("Did not sent the same amount of bytes as received");

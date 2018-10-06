@@ -17,6 +17,7 @@
 const int DEFAULT_PORT = 2012;
 const int NANO_OFFSET  = 1000000000;
 
+
 int setup_socket(){
     int fd;
     fd = socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
@@ -33,14 +34,13 @@ struct in_addr* get_ip(const char *name) {
     struct in_addr *addrp = (struct in_addr*) malloc(sizeof(struct in_addr));
     resolv = gethostbyname(name);
     if (resolv==NULL) {
-        perror("Address not found\n");
+        perror("IP Address not found/invalid");
         exit(1);
     }
     memcpy(addrp,resolv->h_addr_list[0], sizeof(struct in_addr));
-    //addrp = (struct in_addr*) resolv->h_addr_list[0];
-    //free(resolv);
     return addrp;
 }
+
 
 void handle_reply(int fd, int sent_length, char *buff){
     struct sockaddr_in from;
@@ -56,7 +56,6 @@ void handle_reply(int fd, int sent_length, char *buff){
 }
 
 
-
 int send_packet(int fd,struct sockaddr_in to, struct in_addr *ip,char *buff){
     int msg_length,sent_length;
     socklen_t to_len;
@@ -65,11 +64,10 @@ int send_packet(int fd,struct sockaddr_in to, struct in_addr *ip,char *buff){
     msg_length = sizeof(char)*strlen(buff)+1;
 
     //send the packet
-    sent_length = sendto(fd, buff, msg_length, 0,(
-            struct sockaddr *) &to, to_len);
+    sent_length = sendto(fd, buff, msg_length, 0,(struct sockaddr *) &to, to_len);
 
     if(sent_length!=msg_length){
-        perror("Error sending bytes");
+        perror("Error sending packet");
         exit(1);
     }
     return sent_length;
@@ -79,8 +77,8 @@ int send_packet(int fd,struct sockaddr_in to, struct in_addr *ip,char *buff){
 double get_current_secs(clockid_t clock){
     struct timespec time;
     int time_status;
-    time_status = clock_gettime(clock,&time);
 
+    time_status = clock_gettime(clock,&time);
     if(time_status<0){
         perror("Error getting time");
         exit(1);

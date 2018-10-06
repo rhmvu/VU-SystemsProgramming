@@ -7,10 +7,9 @@
 #include <sys/types.h>
 #include <time.h>
 #include <string.h>
-
 #include "pingutils.h"
 
-#define BUFFER_SIZE 18
+#define BUFFER_SIZE 64
 
 
 int main(int argc,char **argv){
@@ -33,7 +32,6 @@ int main(int argc,char **argv){
     to.sin_family = AF_INET;
     to.sin_port  = htons(DEFAULT_PORT);
     to.sin_addr = *ip;
-    free(ip);
 
     clock = CLOCK_PROCESS_CPUTIME_ID;
 
@@ -43,6 +41,8 @@ int main(int argc,char **argv){
     handle_reply(fd,sent_bytes,buff);
     end_time = get_current_secs(clock);
 
+    //free memory and close file descriptor
+    free(ip);
     close_status = close(fd);
     if(close_status<0){
         perror("Error closing socket");

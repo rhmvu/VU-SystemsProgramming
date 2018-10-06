@@ -65,7 +65,7 @@ int main(){
             }
         }
         sent_length = sendto(fd, buff, msg_length, 0,(
-        struct sockaddr *) &from, from_len);
+                struct sockaddr *) &from, from_len);
 
         if(sent_length!=msg_length){
             perror("Did not sent the same amount of bytes as received");

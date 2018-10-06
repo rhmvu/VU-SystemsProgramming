@@ -48,21 +48,24 @@ int main(int argc,char **argv){
     to.sin_addr = *ip;
     free(ip);
 
-    buff = malloc(BUFFER_SIZE* sizeof(char));
+    buff = (char *) malloc(BUFFER_SIZE* sizeof(char));
     clock = CLOCK_PROCESS_CPUTIME_ID;
     count = 1;
 
     while(1){
+        //Put the packet number in the buffer
         buffer_status = sprintf(buff,"%d",count);
         if(buffer_status<0){
             perror("Cannot convert integer to char buffer");
             return 1;
         }
+        //send buffer
         sent_bytes = send_packet(fd,to,ip,buff);
         start_time = get_current_secs(clock);
 
         reply_status = handle_reply_with_timeout(fd,sent_bytes,buff);
 
+        //get packet number from received buffer (should be the same as the sent buffer when everything goes right)
         scan_status = sscanf(buff,"%d",&reply_count);
         if(scan_status<1){
             perror("Couldn't parse int from received bytes");
