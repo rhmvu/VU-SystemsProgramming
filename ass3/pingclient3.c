@@ -15,6 +15,7 @@
 void print_status_with_counter(int reply_status,int reply_count,unsigned int count,double start_time, double end_time){
     if(reply_status == 0) {
         printf("Packet %u: lost.\n",count);
+        return;
     }
 
     if(reply_count == count){
@@ -49,6 +50,11 @@ int main(int argc,char **argv){
     free(ip);
 
     buff = (char *) malloc(BUFFER_SIZE* sizeof(char));
+    if(buff == NULL){
+        perror("Can't allocate memory on heap");
+        return 1;
+    }
+
     clock = CLOCK_PROCESS_CPUTIME_ID;
     count = 1;
 

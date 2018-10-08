@@ -32,6 +32,11 @@ int setup_socket(){
 struct in_addr* get_ip(const char *name) {
     struct hostent *resolv;
     struct in_addr *addrp = (struct in_addr*) malloc(sizeof(struct in_addr));
+
+    if(addrp==NULL){
+        perror("Can't allocate memory on heap");
+        exit(1);
+    }
     resolv = gethostbyname(name);
     if (resolv==NULL) {
         perror("IP Address not found/invalid");
