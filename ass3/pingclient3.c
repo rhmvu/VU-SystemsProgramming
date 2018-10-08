@@ -5,11 +5,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
+#include <signal.h>
 #include "pingutils.h"
 #include "pingutils2.h"
 
 #define BUFFER_SIZE 64
 
+unsigned int breakloop = 0;
 
 
 void print_status_with_counter(int reply_status,int reply_count,unsigned int count,double start_time, double end_time){
@@ -25,10 +27,20 @@ void print_status_with_counter(int reply_status,int reply_count,unsigned int cou
     }
 }
 
+void sigint_handler(int sigint) {
+    if (breakloop == 0){
+        breakloop=1;
+        printf("SIGINT catched. Please wait to let the server close gracefully.\nTo close hard press Ctrl^C again.\n");
+    }
+    else{
+        printf ("SIGINT occurred, exiting hard... please wait\n");
+        exit(-1);
+    }
+}
 
 int main(int argc,char **argv){
     char *buff;
-    int fd, sent_bytes, reply_status,buffer_status,reply_count, scan_status;
+    int fd, sent_bytes, reply_status,buffer_status,reply_count, scan_status, close_status;
     unsigned int count;
     double start_time,end_time;
     struct sockaddr_in to;
@@ -40,6 +52,9 @@ int main(int argc,char **argv){
         printf("Usage: pingclient3 <hostname>\n");
         return 1;
     }
+
+    signal(SIGINT, sigint_handler );	// trap Ctrl^C signals
+
     //get ip of hostname and setup a socket
     ip = get_ip(argv[1]);
     fd = setup_socket();
@@ -47,7 +62,6 @@ int main(int argc,char **argv){
     to.sin_family = AF_INET;
     to.sin_port  = htons(DEFAULT_PORT);
     to.sin_addr = *ip;
-    free(ip);
 
     buff = (char *) malloc(BUFFER_SIZE* sizeof(char));
     if(buff == NULL){
@@ -58,7 +72,7 @@ int main(int argc,char **argv){
     clock = CLOCK_PROCESS_CPUTIME_ID;
     count = 1;
 
-    while(1){
+    while(breakloop != 1){
         //Put the packet number in the buffer
         buffer_status = sprintf(buff,"%d",count);
         if(buffer_status<0){
@@ -82,5 +96,12 @@ int main(int argc,char **argv){
         print_status_with_counter(reply_status,reply_count,count,start_time,end_time);
         count++;
         sleep(1);
+    }
+
+    free(ip);
+    close_status = close(fd);
+    if(close_status<0){
+        perror("Error closing socket");
+        return 1;
     }
 }
