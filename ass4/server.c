@@ -21,6 +21,7 @@
 /// a define used for the copy buffer in stream_data(...)
 #define BUFSIZE 1024
 #define DEFAULT_PORT 2012
+#define FILE_NAME_BUFSIZE 256
 
 static int breakloop = 0;	///< use this variable to stop your wait-loop. Occasionally check its value, !1 signals that the program should close
 
@@ -33,20 +34,30 @@ static int breakloop = 0;	///< use this variable to stop your wait-loop. Occasio
 int stream_data(int client_fd)
 {
 	int data_fd;
-	int channels, sample_size, sample_rate;
+	int channels, sample_size, sample_rate, reply_status, control_status;
 	server_filterfunc pfunc;
 	char *datafile, *libfile;
 	char buffer[BUFSIZE];
-	
+	char *datafile = (char*) malloc(sizeof(char)*FILE_NAME_BUFSIZE);
+	char *libfile = (char*) malloc(sizeof(char)*FILE_NAME_BUFSIZE);
+	if(datafile == NULL || libfile==NULL){
+		perror("Can't allocate memory for control data");
+		return -1;
+	}
+
 	// TO IMPLEMENT
 	// receive a control packet from the client 
 	// containing at the least the name of the file to stream and the library to use
-	control_status = recieve(fd,BUFSIZE,&buffer); //buffer failure??
-    message_status = read_control_message(&datafile,&libfile,buffer);
-    if(message_status <0){
+	reply_status = recieve(fd,BUFSIZE,&buffer); //buffer failure??
+    control_status = read_control_message(&datafile,&libfile,&buffer);
+    if(control_status <0){
         printf("can't parse control packet");
         return -1;
     }
+	if(reply_status <0){
+    	perror("Error receiving control packet");
+		return -1;
+	}
 
 		/*datafile = strdup("example.wav");
 		libfile = NULL;*/
@@ -133,7 +144,7 @@ int main (int argc, char **argv)
 	
 	signal(SIGINT, sigint_handler );	// trap Ctrl^C signals
 
-	fd = create_socket(DEFAULT_PORT);
+	fd = setup_server_socket(DEFAULT_PORT);
 	if(fd<0){
 		perror("Couln't create socket");
 		exit(1);
@@ -145,6 +156,10 @@ int main (int argc, char **argv)
 			perror("Error retrieving bytes from UDP packet");
 			exit(1);
 		}
+		if(!strncmp(buffer,PROT_HELO,msg_length)){ //maybe msglength -1?
+			continue;
+		}
+
 		printf("Host %s port %d: %s\n", msg_length, inet_ntoa(from.sin_addr), ntohs(from.sin_port), buff);
 		stream_status = stream_data(fd);
 		if(stream_status < 0){

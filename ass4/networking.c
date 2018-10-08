@@ -9,12 +9,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#define DEFAULT_PORT 2012
-#define BUFFER_SIZE 2048
 
 
-
-int setup_socket(int port){
+int setup_server_socket(int port){
     int fd,err;
     struct sockaddr_in addr;
     fd = socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
@@ -33,7 +30,38 @@ int setup_socket(int port){
     return fd;
 }
 
-int receive(int fd,int max_reply_length, char *buff){
+int setup_socket(){
+    int fd;
+    fd = socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
+    if (fd<0) {
+        perror("Couln't create socket");
+        exit(1);
+    }
+    return fd;
+}
+
+
+
+
+int send_packet(int fd,struct sockaddr_in to, struct in_addr *ip,char *buff){
+    int msg_length,sent_length;
+    socklen_t to_len;
+    to_len = sizeof(to);
+
+    msg_length = sizeof(char)*strlen(buff)+1;
+
+    //send the packet
+    sent_length = sendto(fd, buff, msg_length, 0,(struct sockaddr *) &to, to_len);
+
+    if(sent_length!=msg_length){
+        perror("Error sending packet");
+        exit(1);
+    }
+    return sent_length;
+}
+
+
+int handle_reply(int fd,int max_reply_length, char *buff){
     struct sockaddr_in from;
     socklen_t from_len;
     struct timeval timeout;
@@ -52,7 +80,7 @@ int receive(int fd,int max_reply_length, char *buff){
         return -1;
     }
     if (sel==0) {
-        return 0;
+        return 0; //time-out
     }
 
     if (FD_ISSET(fd,&read_set)) {
@@ -68,32 +96,3 @@ int receive(int fd,int max_reply_length, char *buff){
     return 1;
 }
 
-
-
-int main(){
-    int fd, msg_length,sent_length;
-    char buff[BUFFER_SIZE];
-    struct sockaddr_in from;
-    socklen_t from_len;
-
-    fd = setup_socket(DEFAULT_PORT);
-
-    from_len = sizeof(from);
-    printf("LISTENING ON PORT %d\n",DEFAULT_PORT);
-
-    while(1){
-        msg_length =  recvfrom(fd, &buff, BUFFER_SIZE, 0,(struct sockaddr *) &from, &from_len);
-        if(msg_length<0){
-            perror("Error retrieving bytes from UDP packet");
-            exit(1);
-        }
-        printf("Received %d bytes from host %s port %d: %s\n", msg_length, inet_ntoa(from.sin_addr), ntohs(from.sin_port), buff);
-        sent_length = sendto(fd, buff, msg_length, 0,(
-                struct sockaddr *) &from, from_len);
-
-        if(sent_length!=msg_length){
-            perror("Did not sent the same amount of bytes as received");
-            exit(1);
-        }
-    }
-}
