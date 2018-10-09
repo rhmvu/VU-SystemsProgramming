@@ -55,14 +55,13 @@ int send_packet(int fd,struct sockaddr_in to, struct in_addr *ip,char *buff){
 
     if(sent_length!=msg_length){
         perror("Error sending packet");
-        exit(1);
+        return -1;
     }
     return sent_length;
 }
 
 
-int handle_reply(int fd,int max_reply_length, char *buff){
-    struct sockaddr_in from;
+int receive_packet_with_timeout(int fd,int max_reply_length, sockaddr_in *from, char *buff){
     socklen_t from_len;
     struct timeval timeout;
     fd_set read_set;
@@ -87,11 +86,11 @@ int handle_reply(int fd,int max_reply_length, char *buff){
         received_length = recvfrom(fd, buff, max_reply_length, 0, (struct sockaddr *) &from, &from_len);
         if (received_length < 0) {
             perror("Error retrieving bytes from UDP packet");
-            exit(1);
+            return -1;
         }
     }else{
         perror("File descriptor is not set as readable, though no timeout occurred");
-        exit(1);
+        return -1;
     }
     return 1;
 }

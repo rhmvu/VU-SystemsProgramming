@@ -12,16 +12,15 @@
 #include <unistd.h>
 #include <dlfcn.h>
 #include <signal.h>
-#include <netinet/in.h>
 
 #include "library.h"
 #include "audio.h"
 #include "networking.h"
+#include "protocol.h"
 
 /// a define used for the copy buffer in stream_data(...)
 #define BUFSIZE 1024
 #define DEFAULT_PORT 2012
-#define FILE_NAME_BUFSIZE 256
 
 static int breakloop = 0;	///< use this variable to stop your wait-loop. Occasionally check its value, !1 signals that the program should close
 
@@ -34,7 +33,7 @@ static int breakloop = 0;	///< use this variable to stop your wait-loop. Occasio
 int stream_data(int client_fd)
 {
 	int data_fd;
-	int channels, sample_size, sample_rate, reply_status, control_status;
+	int channels, sample_size, sample_rate, control_status;
 	server_filterfunc pfunc;
 	char *datafile, *libfile;
 	char buffer[BUFSIZE];
@@ -48,8 +47,7 @@ int stream_data(int client_fd)
 	// TO IMPLEMENT
 	// receive a control packet from the client 
 	// containing at the least the name of the file to stream and the library to use
-	reply_status = recieve(fd,BUFSIZE,&buffer); //buffer failure??
-    control_status = read_control_message(&datafile,&libfile,&buffer);
+    control_status = handle_control_message(fd,&datafile,&libfile);
     if(control_status <0){
         printf("can't parse control packet");
         return -1;
@@ -138,6 +136,7 @@ int main (int argc, char **argv)
 	char buffer[BUFSIZE];
 	struct sockaddr_in from;
 	socklen_t from_len;
+	from_len = sizeof(from);
 
 	printf ("SysProg network server\n");
 	printf ("handed in by Ruben van der Ham, 2592271\n");
@@ -145,23 +144,17 @@ int main (int argc, char **argv)
 	signal(SIGINT, sigint_handler );	// trap Ctrl^C signals
 
 	fd = setup_server_socket(DEFAULT_PORT);
+
 	if(fd<0){
 		perror("Couln't create socket");
 		exit(1);
 	}
 	
 	while (!breakloop){
-		msg_length =  recvfrom(fd, &buffer, BUFSIZE, 0,(struct sockaddr *) &from, &from_len);
-		if(msg_length<0){
-			perror("Error retrieving bytes from UDP packet");
-			exit(1);
-		}
-		if(!strncmp(buffer,PROT_HELO,msg_length)){ //maybe msglength -1?
-			continue;
-		}
+		handle_helo_connection_setup(fd,from);
 
-		printf("Host %s port %d: %s\n", msg_length, inet_ntoa(from.sin_addr), ntohs(from.sin_port), buff);
-		stream_status = stream_data(fd);
+
+		stream_status = stream_data(fd,from,from_len);
 		if(stream_status < 0){
 			perror("Error streaming to %s", inet_ntoa(from.sin_addr));
 			break;
