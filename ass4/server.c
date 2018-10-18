@@ -38,22 +38,21 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 	int channels, sample_size, sample_rate, control_status;
 	server_filterfunc pfunc;
 	char buffer[BUFSIZE];
-	char *datafile = (char*) malloc(sizeof(char)*FILENAME_SIZE);
-	char *libfile = (char*) malloc(sizeof(char)*FILENAME_SIZE);
-	if(datafile == NULL || libfile==NULL){
-		perror("Can't allocate memory for control data");
-		return -1;
-	}
+	char *datafile = (char*) allocate_memory(FILENAME_SIZE);
+	char *libfile = (char*) allocate_memory(FILENAME_SIZE);
 
 	// TO IMPLEMENT
 	// receive a control packet from the client 
 	// containing at the least the name of the file to stream and the library to use
-    control_status = handle_control_message(client_fd,datafile,libfile);
+	printf("getting control packet\n");
+    control_status = handle_control_message(client_fd,from,datafile,libfile);
     if(control_status <0){
         printf("can't parse control packet");
         return -1;
     }
-
+	printf("initiating rst\n");
+    initiate_rst(client_fd,from);
+    exit(2);
     /*
 	if(reply_status <0){
     	perror("Error receiving control packet");
@@ -67,7 +66,7 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 	data_fd = aud_readinit(datafile, &sample_rate, &sample_size, &channels);
 	if (data_fd < 0){
 		printf("failed to open datafile %s, skipping request\n",datafile);
-		send_message(client_fd,from,"FAIL:datafile",50);
+		send_message(client_fd,from,"FAIL:datafile",14);
 		initiate_rst(client_fd,from);
 		return -1;
 	}
@@ -77,6 +76,9 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 	if (libfile){
 		// try to open the library, if one is requested
 		pfunc = NULL;
+		//open lib
+
+
 		if (!pfunc){
 			printf("failed to open the requested library. breaking hard\n");
 			return -1;
@@ -140,7 +142,7 @@ int main (int argc, char **argv)
 	/*char buffer[BUFSIZE];*/
 	struct sockaddr_in* from;
 	socklen_t from_len;
-	from_len = sizeof(from);
+	from_len = sizeof(struct sockaddr_in);
 	from = malloc(from_len);
 
 	printf ("SysProg network server\n");
@@ -149,25 +151,27 @@ int main (int argc, char **argv)
 	signal(SIGINT, sigint_handler );	// trap Ctrl^C signals
 
 	fd = setup_server_socket(DEFAULT_PORT);
-
+	printf("Server socket setup\n\n");
 	if(fd<0){
 		perror("Couln't create socket");
 		exit(1);
 	}
 	
 	while (!breakloop){
-		helo_status = handle_helo_connection_setup(fd,from);
-		if(helo_status == 0 || helo_status == -1){
+		//printf("In loop\n");
+		helo_status = handle_helo_connection(fd,from);
+		if(helo_status == -1){
 			//on timeout ACK packet or error: reset connection
 			for (int i = 0; i < 3 && rst_status !=1; ++i) {
 				rst_status = initiate_rst(fd,from);
 			}
 		} else if(helo_status ==2){
-			//on connection reset:
+			//on connection successful reset:
+			continue;
+		} else if(helo_status == 0){
 			continue;
 		}
-
-
+		//printf("HELO SUCCESS");
 		stream_status = stream_data(fd,from,from_len);
 		if(stream_status < 0){
 			/*perror("Error streaming to %s", inet_ntoa(from.sin_addr));*/
@@ -184,6 +188,7 @@ int main (int argc, char **argv)
 		perror("Couldn't close filedescriptor");
 	}
 	free(from);
+	printf("server closed\n");
 
 	return 0;
 }

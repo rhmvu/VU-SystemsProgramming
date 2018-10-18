@@ -16,6 +16,9 @@
 
 #include "library.h"
 #include "audio.h"
+#include "networking.h"
+#include "protocol.h"
+
 
 #define BUFSIZE 1024
 
@@ -36,13 +39,24 @@ void sigint_handler(int sigint)
 
 int main (int argc, char *argv [])
 {
-	int server_fd, audio_fd;
-	int sample_size, sample_rate, channels;
+	int server_fd, audio_fd, helo_status, control_status;
+	int* sample_size;
+	int* sample_rate;
+	int* channels;
 	client_filterfunc pfunc;
-	char buffer[BUFSIZE];
+	struct in_addr *ip;
+	struct sockaddr_in to;
+
+	char* buffer = (char *) allocate_memory(BUFSIZE);
+
+	sample_size = (int *) allocate_memory(sizeof(int));
+	sample_rate = (int *) allocate_memory(sizeof(int));
+	channels = (int *) allocate_memory(sizeof(int));
+
+
 
 	printf ("SysProg2006 network client\n");
-	printf ("handed in by VOORBEELDSTUDENT\n");
+	printf ("handed in by Ruben van der Ham, 2592271\n");
 	
 	signal( SIGINT, sigint_handler );	// trap Ctrl^C signals
 	
@@ -51,25 +65,69 @@ int main (int argc, char *argv [])
 		printf ("error : called with incorrect number of parameters\nusage : %s <server_name/IP> <filename> [<filter> [filter_options]]]\n", argv[0]) ;
 		return -1;
 	}
-	
-	// TO IMPLEMENT : open input
-	server_fd = -1;
-	if (server_fd < 0){
-		printf("error: unable to connect to server.\n");
+
+
+	if(argc<2){
+		printf("Usage: pingclient1 <hostname>\n");
+		return 1;
+	}
+	//get ip of hostname and setup a socket
+	ip = get_ip(argv[1]);
+	server_fd = setup_socket();
+
+	to.sin_family = AF_INET;
+	to.sin_port  = htons(DEFAULT_PORT);
+	to.sin_addr = *ip;
+
+	//try to connect to the server 3 times
+	for (int i = 0; i < 3; ++i) {
+		helo_status = setup_helo_connection(server_fd,&to);
+		if(helo_status == 1){
+			break;
+		}
+		sleep(1);
+	}
+	//0 on timeout, -1 on error, 1 on success, 2 on succesfull connection reset
+	if(helo_status == 2){
+		printf("Connection reset during helo\n");
 		return -1;
 	}
+	if(helo_status == 0){
+		printf("Timeout couldn't reach server\n");
+		return -1;
+	}
+	if(helo_status == -1){
+		printf("Error sending HELO message to server\n");
+		return -1;
+	}
+
+	//printf("HELO SUCCESS");
+	control_status = setup_control_message(server_fd,&to,argv[2],argv[3]);
+	if(control_status == -1){
+		initiate_rst(server_fd,&to);
+	}
+	if(control_status == 2){
+		printf("Server has reset the connection\n");
+		return -1;
+	}
+	if(control_status == 0){
+		printf("Control timeout\n");
+		return -1;
+	}
+
+	printf("CONTROL SUCCESS\n");
 
 	// TO IMPLEMENT
 	// send the requested filename and library information to the server
 	// and wait for an acknowledgement. Or fail if the server returns an errorcode	
 	{
-		sample_size = 4;
-		sample_rate = 44100;
-		channels = 2;
+		*sample_size = 4;
+		*sample_rate = 44100;
+		*channels = 2;
 	}
 	
 	// open output
-	audio_fd = aud_writeinit(sample_rate, sample_size, channels);
+	audio_fd = aud_writeinit((int) *sample_rate,(int) *sample_size,(int) *channels);
 	if (audio_fd < 0){
 		printf("error: unable to open audio output.\n");
 		return -1;
@@ -104,6 +162,12 @@ int main (int argc, char *argv [])
 			bytesread = read(server_fd, buffer, BUFSIZE);
 		}
 	}
+
+	free(channels);
+	free(sample_rate);
+	free(sample_size);
+	free(ip);
+	free(buffer);
 
 	if (audio_fd >= 0)	
 		close(audio_fd);

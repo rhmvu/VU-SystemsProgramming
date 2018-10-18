@@ -4,11 +4,13 @@
 
 #include "networking.h"
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 
 
 int setup_server_socket(int port){
@@ -40,19 +42,36 @@ int setup_socket(){
     return fd;
 }
 
+struct in_addr* get_ip(const char *name) {
+    struct hostent *resolv;
+    struct in_addr *addrp = (struct in_addr*) malloc(sizeof(struct in_addr));
+
+    if(addrp==NULL){
+        perror("Can't allocate memory on heap");
+        exit(1);
+    }
+    resolv = gethostbyname(name);
+    if (resolv==NULL) {
+        perror("IP Address not found/invalid");
+        exit(1);
+    }
+    memcpy(addrp,resolv->h_addr_list[0], sizeof(struct in_addr));
+    return addrp;
+}
 
 
-
-int send_packet(int fd,struct sockaddr_in to, struct in_addr *ip,char *buff, int msg_length){
+int send_packet(int fd,struct sockaddr_in *to,char *buff, int msg_length){
     int sent_length;
     socklen_t to_len;
-    to_len = sizeof(to);
+    to_len = sizeof(*to);
+    //printf("Host %s port %d: %s\n", inet_ntoa(to->sin_addr), ntohs(to->sin_port), buff);
 
     //send the packet
-    sent_length = sendto(fd, buff, msg_length, 0,(struct sockaddr *) &to, to_len);
+    sent_length = sendto(fd, buff, msg_length, 0,(struct sockaddr *) to, to_len);
 
     if(sent_length!=msg_length){
-        perror("Error sending packet");
+        printf("sent %d, expected %d\n", sent_length, msg_length);
+        perror("Error sending packet\n\n");
         return -1;
     }
     return sent_length;
@@ -81,7 +100,7 @@ int receive_packet_with_timeout(int fd,int max_reply_length, struct sockaddr_in 
     }
 
     if (FD_ISSET(fd,&read_set)) {
-        received_length = recvfrom(fd, buff, max_reply_length, 0, (struct sockaddr *) &from, &from_len);
+        received_length = recvfrom(fd, buff, max_reply_length, 0, (struct sockaddr *) from, &from_len);
         if (received_length < 0) {
             perror("Error retrieving bytes from UDP packet");
             return -1;
@@ -90,6 +109,6 @@ int receive_packet_with_timeout(int fd,int max_reply_length, struct sockaddr_in 
         perror("File descriptor is not set as readable, though no timeout occurred");
         return -1;
     }
-    return 1;
+    return received_length;
 }
 
