@@ -43,12 +43,10 @@ int setup_socket(){
 
 
 
-int send_packet(int fd,struct sockaddr_in to, struct in_addr *ip,char *buff){
-    int msg_length,sent_length;
+int send_packet(int fd,struct sockaddr_in to, struct in_addr *ip,char *buff, int msg_length){
+    int sent_length;
     socklen_t to_len;
     to_len = sizeof(to);
-
-    msg_length = sizeof(char)*strlen(buff)+1;
 
     //send the packet
     sent_length = sendto(fd, buff, msg_length, 0,(struct sockaddr *) &to, to_len);
@@ -61,7 +59,7 @@ int send_packet(int fd,struct sockaddr_in to, struct in_addr *ip,char *buff){
 }
 
 
-int receive_packet_with_timeout(int fd,int max_reply_length, sockaddr_in *from, char *buff){
+int receive_packet_with_timeout(int fd,int max_reply_length, struct sockaddr_in *from, char *buff){
     socklen_t from_len;
     struct timeval timeout;
     fd_set read_set;

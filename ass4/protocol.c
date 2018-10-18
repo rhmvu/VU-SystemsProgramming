@@ -7,13 +7,21 @@
 #include "protocol.h"
 #include "networking.h"
 
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+
 const int CONTROL_FAIL_DATAFILE = 1;
 const int CONTROL_FAIL_LIBRARY = 2;
 const int CONTROL_FAIL_GENERIC = 3;
-const char* PROT_HELO = "HELO";
-const char* PROT_ACK = "ACK";
-const char* PROT_RST = "RST";
-const char* PROT_RST_ACK = "RST_ACK";
+const char* TOKEN_DELIMITER = ",";
+char* PROT_HELO = "HELO";
+char* PROT_ACK = "ACK";
+char* PROT_RST = "RST";
+char* PROT_RST_ACK = "RST_ACK";
 
 const char* TOKEN_DATAFILE = "datafile";
 const char* TOKEN_LIBFILE = "libfile";
@@ -21,6 +29,7 @@ const char* TOKEN_LIBFILE = "libfile";
 const int CONTROL_BUFSIZE =  2048;
 const int HELO_BUFSIZE =  8;
 const int FILENAME_SIZE =  512;
+const int PROT_HELO_SIZE =  5;
 const int PROT_ACK_SIZE =  4;
 const int PROT_RST_SIZE =  4;
 const int PROT_RST_ACK_SIZE =  8;
@@ -30,8 +39,13 @@ const int PROT_RST_ACK_SIZE =  8;
  * @return: 0 on timeout, -1 on error, 1 success
  */
 int handle_control_message(int fd, struct sockaddr_in *from,char* datafile, char* libfile){
-    int reply_status, tokenize_status;
-    char buffer[CONTROL_BUFSIZE];
+    int receive_status, tokenize_status;
+    char* buffer = malloc(CONTROL_BUFSIZE);
+    if(buffer == 0){
+        perror("Cant allocate memroy");
+        exit(1);
+    }
+
     /*char **data;
 
     //Initialize charbuffers
@@ -44,7 +58,7 @@ int handle_control_message(int fd, struct sockaddr_in *from,char* datafile, char
     }*/
 
 
-    reply_status = receive_message(fd,from,&buffer,CONTROL_BUFSIZE); //buffer failure??
+    receive_status = receive_message(fd,from,buffer,CONTROL_BUFSIZE); //buffer failure??
     if(receive_status == 0){
         //timeout occured
         return 0;
@@ -63,6 +77,7 @@ int handle_control_message(int fd, struct sockaddr_in *from,char* datafile, char
         printf("Tokenize failed");
         return -1;
     }
+    free(buffer);
 
     return 1;
 }
@@ -74,7 +89,7 @@ int handle_helo_connection_setup(int fd, struct sockaddr_in *from){
     int receive_status, sent_status;
     char buffer[HELO_BUFSIZE];
 
-    receive_status = receive_message(fd, CONTROL_BUFSIZE,(struct sockaddr *) from,(char *) &buffer, HELO_BUFSIZE);
+    receive_status = receive_message(fd, from,(char *) &buffer, HELO_BUFSIZE);
     if(receive_status == 0){
        //timeout occured
         return 0;
@@ -90,10 +105,10 @@ int handle_helo_connection_setup(int fd, struct sockaddr_in *from){
         return -1;
     }
 
-    printf("Host %s port %d: %s\n", msg_length, inet_ntoa(from->sin_addr), ntohs(from->sin_port), buff);
+    printf("Host %s port %d: %s\n", inet_ntoa(from->sin_addr), ntohs(from->sin_port), buffer);
 
     //send HELO back
-    sent_status = send_message(fd,from,from->sin_addr,PROT_HELO);
+    sent_status = send_message(fd,from,PROT_HELO,PROT_HELO_SIZE);
 
     if(sent_status == 0){
         //timeout occured
@@ -109,7 +124,7 @@ int handle_helo_connection_setup(int fd, struct sockaddr_in *from){
 
 
 
-    if(!strncmp(buffer,PROT_ACK,msg_length)){ //maybe msglength -1?
+    if(!strncmp(buffer,PROT_ACK,PROT_ACK_SIZE)){ //maybe msglength -1?
         return -1;
     }
     return 1;
@@ -120,13 +135,13 @@ int handle_helo_connection_setup(int fd, struct sockaddr_in *from){
  */
 int initiate_rst(int fd,struct sockaddr_in *from) {
     int receive_status;
-    char buffer[HELO_BUFSIZE];
-    int msg_length;
+    //char buffer[HELO_BUFSIZE];
+    //int msg_length;
     //send RST
-    send_packet(fd,from,from->sin_addr,PROT_RST);
+    send_packet(fd,*from,&from->sin_addr,PROT_RST,PROT_RST_SIZE);
 
     //receive RST_ACK
-    receive_status = receive_message(fd,from,PROT_RST,PROT_RST_SIZE);
+    receive_status = receive_message(fd, from,PROT_RST,PROT_RST_SIZE);
     if(receive_status == 0){
         //timeout occurred
         return 0;
@@ -148,7 +163,7 @@ int initiate_rst(int fd,struct sockaddr_in *from) {
  */
 
 int reply_to_rst(int fd,struct sockaddr_in *from){
-    int sent_status = send_message(fd,from,from->sin_addr,PROT_RST_ACK,PROT_RST_ACK_SIZE);
+    int sent_status = send_message(fd,from,PROT_RST_ACK,PROT_RST_ACK_SIZE);
     if(sent_status  != 1){
         return -1;
     }
@@ -185,20 +200,23 @@ int tokenize_control_message(char* message,char* datafile, char* libfile){
 /*
  * @return: 0 on timeout, -1 on error, 1 on success
  */
-int send_message(int fd, struct sock_addr_in *to, char* buff, int buf_size){
-    int sent_status,msg_length;
-    char ack_buffer[PROT_ACK_SIZE];
+int send_message(int fd, struct sockaddr_in *to, char* buff, int buf_size){
+    int sent_status, receive_status;
+    char *ack_buffer = malloc(PROT_ACK_SIZE);
+    if(ack_buffer == 0){
+        perror("Cant allocate memroy");
+        exit(1);
+    }
 
-    sent_status = send_packet(fd,to,to->sin_addr,buff);
+    sent_status = send_packet(fd,*to,&to->sin_addr,buff, buf_size);
 
-    msg_length = strnlen(buffer,buf_size); //max bufsize
-    if(sent_status != msg_length){
+    if(sent_status != buf_size){
         return -1;
     }
 
 
     //receive first ack
-    receive_status = receive_packet_with_timeout(fd, PROT_ACK_SIZE,(struct sockaddr *) from,&ack_buffer);
+    receive_status = receive_packet_with_timeout(fd, PROT_ACK_SIZE, to,ack_buffer);
     if(receive_status == 0){
         //timeout occurred
         return 0;
@@ -211,7 +229,7 @@ int send_message(int fd, struct sock_addr_in *to, char* buff, int buf_size){
     }
 
     //send second ack
-    sent_status = send_packet(fd,to,to->sin_addr,PROT_ACK);
+    sent_status = send_packet(fd, *to,&to->sin_addr,PROT_ACK,PROT_ACK_SIZE);
 
     if(sent_status != PROT_ACK_SIZE){
         return -1;
@@ -224,11 +242,11 @@ int send_message(int fd, struct sock_addr_in *to, char* buff, int buf_size){
 /*
  * @return: 0 on timeout, -1 on error, 1 on success, 2 on RST, 3 on RST_ACK
  */
-int receive_message(int fd, struct sockaddr *from, char* buff,int buf_size){
-    int receive_status;
+int receive_message(int fd, struct sockaddr_in *from, char* buff,int buf_size){
+    int receive_status, sent_status;
     char ack_buffer[PROT_ACK_SIZE];
 
-    receive_status = receive_packet_with_timeout(fd, buf_size,(struct sockaddr *) from,(char *) buff);
+    receive_status = receive_packet_with_timeout(fd, buf_size,from,(char *) buff);
     if(receive_status == 0){
         //timeout occurred
         return 0;
@@ -241,14 +259,14 @@ int receive_message(int fd, struct sockaddr *from, char* buff,int buf_size){
     }
 
     //send first ack
-    sent_status = send_packet(fd,from,from->sin_addr,PROT_ACK);
+    sent_status = send_packet(fd, *from,&from->sin_addr,PROT_ACK,PROT_ACK_SIZE);
 
     if(sent_status < PROT_ACK_SIZE){
         return -1;
     }
 
     //receive second ack
-    receive_status = receive_packet_with_timeout(fd, PROT_ACK_SIZE,(struct sockaddr *) from,&ack_buffer);
+    receive_status = receive_packet_with_timeout(fd, PROT_ACK_SIZE, from,ack_buffer);
     if(receive_status == 0){
         //timeout occurred
         return -1;

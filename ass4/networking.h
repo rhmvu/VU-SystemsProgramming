@@ -15,8 +15,8 @@
 int setup_server_socket(int port);
 int setup_socket();
 
-int send_packet(int fd,struct sockaddr_in to, struct in_addr *ip,char *buff);
-int handle_reply(int fd,int max_reply_length, char *buff);
+int send_packet(int fd,struct sockaddr_in to, struct in_addr *ip,char *buff, int msg_length);
+int receive_packet_with_timeout(int fd,int max_reply_length, struct sockaddr_in *from, char *buff);
 
 
 #endif //SYSTEMSPROGRAMMING_NETWORKING_H
