@@ -145,6 +145,8 @@ int handle_control_message(int fd, struct sockaddr_in *from,char* datafile, char
 }
 
 
+//TODO: confirm control message
+
 /*
  * @return: 0 on timeout, -1 on error, 1 on success, 2 on succesfull connection reset
  */

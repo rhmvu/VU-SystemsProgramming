@@ -50,9 +50,6 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
         printf("can't parse control packet");
         return -1;
     }
-	printf("initiating rst\n");
-    initiate_rst(client_fd,from);
-    exit(2);
     /*
 	if(reply_status <0){
     	perror("Error receiving control packet");

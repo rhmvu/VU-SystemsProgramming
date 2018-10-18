@@ -105,6 +105,7 @@ int main (int argc, char *argv [])
 	control_status = setup_control_message(server_fd,&to,argv[2],argv[3]);
 	if(control_status == -1){
 		initiate_rst(server_fd,&to);
+		return -1;
 	}
 	if(control_status == 2){
 		printf("Server has reset the connection\n");
