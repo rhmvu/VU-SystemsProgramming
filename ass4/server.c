@@ -37,8 +37,8 @@ int stream_data(int client_fd)
 	server_filterfunc pfunc;
 	char *datafile, *libfile;
 	char buffer[BUFSIZE];
-	char *datafile = (char*) malloc(sizeof(char)*FILE_NAME_BUFSIZE);
-	char *libfile = (char*) malloc(sizeof(char)*FILE_NAME_BUFSIZE);
+	char *datafile = (char*) malloc(sizeof(char)*FILENAME_SIZE);
+	char *libfile = (char*) malloc(sizeof(char)*FILENAME_SIZE);
 	if(datafile == NULL || libfile==NULL){
 		perror("Can't allocate memory for control data");
 		return -1;
@@ -132,7 +132,7 @@ void sigint_handler(int sigint)
 /// the main loop, continuously waiting for clients
 int main (int argc, char **argv)
 {
-	int msg_length, fd, close_status, stream_status;
+	int msg_length, fd, close_status, stream_status, helo_status,rst_status;
 	char buffer[BUFSIZE];
 	struct sockaddr_in from;
 	socklen_t from_len;
@@ -151,7 +151,16 @@ int main (int argc, char **argv)
 	}
 	
 	while (!breakloop){
-		handle_helo_connection_setup(fd,from);
+		helo_status = handle_helo_connection_setup(fd,from);
+		if(helo_status == 0 || helo_status == -1){
+			//on timeout ACK packet or error: reset connection
+			for (int i = 0; i < 3 && rst_status !=1; ++i) {
+				rst_status = initiate_rst(fd,from);
+			}
+		} else if(helo_status ==2){
+			//on connection reset:
+			continue;
+		}
 
 
 		stream_status = stream_data(fd,from,from_len);
