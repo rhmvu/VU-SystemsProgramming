@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <dlfcn.h>
 #include <signal.h>
+#include <errno.h>
 
 #include "library.h"
 #include "audio.h"
@@ -19,7 +20,8 @@
 #include "protocol.h"
 
 /// a define used for the copy buffer in stream_data(...)
-#define BUFSIZE 1024
+#define BUFSIZE 4096
+#define FILENAME_SIZE 256
 #define DEFAULT_PORT 2012
 
 static int breakloop = 0;	///< use this variable to stop your wait-loop. Occasionally check its value, !1 signals that the program should close
@@ -30,12 +32,11 @@ static int breakloop = 0;	///< use this variable to stop your wait-loop. Occasio
 ///
 /// @param fd an opened file descriptor for reading and writing
 /// @return returns 0 on success or a negative errorcode on failure
-int stream_data(int client_fd)
+int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 {
 	int data_fd;
 	int channels, sample_size, sample_rate, control_status;
 	server_filterfunc pfunc;
-	char *datafile, *libfile;
 	char buffer[BUFSIZE];
 	char *datafile = (char*) malloc(sizeof(char)*FILENAME_SIZE);
 	char *libfile = (char*) malloc(sizeof(char)*FILENAME_SIZE);
@@ -47,15 +48,17 @@ int stream_data(int client_fd)
 	// TO IMPLEMENT
 	// receive a control packet from the client 
 	// containing at the least the name of the file to stream and the library to use
-    control_status = handle_control_message(fd,&datafile,&libfile);
+    control_status = handle_control_message(client_fd,datafile,libfile);
     if(control_status <0){
         printf("can't parse control packet");
         return -1;
     }
+
+    /*
 	if(reply_status <0){
     	perror("Error receiving control packet");
 		return -1;
-	}
+	}*/
 
 		/*datafile = strdup("example.wav");
 		libfile = NULL;*/
@@ -64,7 +67,8 @@ int stream_data(int client_fd)
 	data_fd = aud_readinit(datafile, &sample_rate, &sample_size, &channels);
 	if (data_fd < 0){
 		printf("failed to open datafile %s, skipping request\n",datafile);
-		send_client("FAIL:datafile")
+		send_message(client_fd,from,"FAIL:datafile",50);
+		initiate_rst(client_fd,from);
 		return -1;
 	}
 	printf("opened datafile %s\n",datafile);
@@ -132,11 +136,12 @@ void sigint_handler(int sigint)
 /// the main loop, continuously waiting for clients
 int main (int argc, char **argv)
 {
-	int msg_length, fd, close_status, stream_status, helo_status,rst_status;
-	char buffer[BUFSIZE];
-	struct sockaddr_in from;
+	int fd, close_status, stream_status, helo_status,rst_status;
+	/*char buffer[BUFSIZE];*/
+	struct sockaddr_in* from;
 	socklen_t from_len;
 	from_len = sizeof(from);
+	from = malloc(from_len);
 
 	printf ("SysProg network server\n");
 	printf ("handed in by Ruben van der Ham, 2592271\n");
@@ -165,7 +170,8 @@ int main (int argc, char **argv)
 
 		stream_status = stream_data(fd,from,from_len);
 		if(stream_status < 0){
-			perror("Error streaming to %s", inet_ntoa(from.sin_addr));
+			/*perror("Error streaming to %s", inet_ntoa(from.sin_addr));*/
+			fprintf(stderr, "Error streaming to %s\n", strerror(errno));
 			break;
 		}
 		// TO IMPLEMENT: 
@@ -177,6 +183,7 @@ int main (int argc, char **argv)
 	if(close_status < 0) {
 		perror("Couldn't close filedescriptor");
 	}
+	free(from);
 
 	return 0;
 }

@@ -29,7 +29,7 @@ const int PROT_RST_ACK_SIZE =  8;
 /*
  * @return: 0 on timeout, -1 on error, 1 success
  */
-void handle_control_message(int fd, struct sockaddr_in *from,char* datafile, char* libfile){
+int handle_control_message(int fd, struct sockaddr_in *from,char* datafile, char* libfile){
     int reply_status, tokenize_status;
     char buffer[CONTROL_BUFSIZE];
     /*char **data;
@@ -70,7 +70,7 @@ void handle_control_message(int fd, struct sockaddr_in *from,char* datafile, cha
 /*
  * @return: 0 on timeout, -1 on error, 1 on success, 2 on connection reset
  */
-int handle_helo_connection_setup(int fd, sockaddr_in *from){
+int handle_helo_connection_setup(int fd, struct sockaddr_in *from){
     int receive_status, sent_status;
     char buffer[HELO_BUFSIZE];
 
@@ -118,7 +118,7 @@ int handle_helo_connection_setup(int fd, sockaddr_in *from){
 /*
  * @return: 0 on timeout, -1 on error, 1 on success
  */
-int initiate_rst(fd,sockaddr_in *from) {
+int initiate_rst(int fd,struct sockaddr_in *from) {
     int receive_status;
     char buffer[HELO_BUFSIZE];
     int msg_length;
@@ -147,7 +147,7 @@ int initiate_rst(fd,sockaddr_in *from) {
  * @return: -1 on error, 1 on success
  */
 
-int reply_to_rst(fd,sockaddr_in *from){
+int reply_to_rst(int fd,struct sockaddr_in *from){
     int sent_status = send_message(fd,from,from->sin_addr,PROT_RST_ACK,PROT_RST_ACK_SIZE);
     if(sent_status  != 1){
         return -1;

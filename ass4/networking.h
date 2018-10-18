@@ -5,6 +5,12 @@
 #ifndef SYSTEMSPROGRAMMING_NETWORKING_H
 #define SYSTEMSPROGRAMMING_NETWORKING_H
 
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
 
 int setup_server_socket(int port);
 int setup_socket();
