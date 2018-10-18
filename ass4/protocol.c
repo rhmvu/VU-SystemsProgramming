@@ -7,30 +7,30 @@
 #include "protocol.h"
 #include "networking.h"
 
-extern const int CONTROL_FAIL_DATAFILE = 1;
-extern const int CONTROL_FAIL_LIBRARY = 2;
-extern const int CONTROL_FAIL_GENERIC = 3;
-extern const char* PROT_HELO = "HELO";
-extern const char* PROT_ACK = "ACK";
-extern const char* PROT_RST = "RST";
-extern const char* PROT_RST_ACK = "RST_ACK";
+const int CONTROL_FAIL_DATAFILE = 1;
+const int CONTROL_FAIL_LIBRARY = 2;
+const int CONTROL_FAIL_GENERIC = 3;
+const char* PROT_HELO = "HELO";
+const char* PROT_ACK = "ACK";
+const char* PROT_RST = "RST";
+const char* PROT_RST_ACK = "RST_ACK";
 
 const char* TOKEN_DATAFILE = "datafile";
 const char* TOKEN_LIBFILE = "libfile";
 
-extern const int CONTROL_BUFSIZE =  2048;
-extern const int HELO_BUFSIZE =  8;
-extern const int FILENAME_SIZE =  512;
-extern const int PROT_ACK_SIZE =  4;
-extern const int PROT_RST_SIZE =  4;
-extern const int PROT_RST_ACK_SIZE =  8;
+const int CONTROL_BUFSIZE =  2048;
+const int HELO_BUFSIZE =  8;
+const int FILENAME_SIZE =  512;
+const int PROT_ACK_SIZE =  4;
+const int PROT_RST_SIZE =  4;
+const int PROT_RST_ACK_SIZE =  8;
 
 
 /*
  * @return: 0 on timeout, -1 on error, 1 success
  */
-void handle_control_message(int fd, char* datafile, char* libfile){
-    int reply_status;
+void handle_control_message(int fd, struct sockaddr_in *from,char* datafile, char* libfile){
+    int reply_status, tokenize_status;
     char buffer[CONTROL_BUFSIZE];
     /*char **data;
 
@@ -44,7 +44,7 @@ void handle_control_message(int fd, char* datafile, char* libfile){
     }*/
 
 
-    reply_status = receive_packet_with_timeout(fd,CONTROL_BUFSIZE,&buffer); //buffer failure??
+    reply_status = receive_message(fd,from,&buffer,CONTROL_BUFSIZE); //buffer failure??
     if(receive_status == 0){
         //timeout occured
         return 0;
@@ -52,9 +52,19 @@ void handle_control_message(int fd, char* datafile, char* libfile){
     if(receive_status < 0){
         return -1;
     }
+    if(receive_status == 2){
+        reply_to_rst(fd,from);
+        return -1;
+    }
 
 
+    tokenize_status = tokenize_control_message(buffer,datafile,libfile);
+    if(tokenize_status <0){
+        printf("Tokenize failed");
+        return -1;
+    }
 
+    return 1;
 }
 
 /*
@@ -133,6 +143,10 @@ int initiate_rst(fd,sockaddr_in *from) {
 }
 
 
+/*
+ * @return: -1 on error, 1 on success
+ */
+
 int reply_to_rst(fd,sockaddr_in *from){
     int sent_status = send_message(fd,from,from->sin_addr,PROT_RST_ACK,PROT_RST_ACK_SIZE);
     if(sent_status  != 1){
@@ -143,7 +157,7 @@ int reply_to_rst(fd,sockaddr_in *from){
 
 
 /*
- *@return: 0 failed, 1 success
+ *@return: -1 failed, 1 success
  */
 int tokenize_control_message(char* message,char* datafile, char* libfile){
     char *token;
@@ -165,7 +179,6 @@ int tokenize_control_message(char* message,char* datafile, char* libfile){
     }
     return 1;
 }
-
 
 
 
@@ -243,7 +256,6 @@ int receive_message(int fd, struct sockaddr *from, char* buff,int buf_size){
     if(strncmp(ack_buffer,PROT_ACK,PROT_ACK_SIZE)) { //maybe msglength -1?
         return -1;
     }
-
     return 1;
 }
 
