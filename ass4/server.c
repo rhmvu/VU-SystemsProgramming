@@ -96,7 +96,7 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 		printf("not using a filter\n");
 	}
 
-	cc_status = confirm_control_message(client_fd,from);
+	cc_status = confirm_control_message(client_fd,from,sample_size,sample_rate,channels);
 	if(cc_status == 0){
         printf("Client timeout\nConnection reset");
         initiate_rst(client_fd,from);
@@ -112,7 +112,7 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 	
 	// start streaming
 	{
-		int bytesread, bytesmod;
+		int bytesread, bytesmod, sent_status;
 		bytesmod = 0;
 		bytesread = 0;
 		
@@ -127,7 +127,25 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 			else{
 			    bytesmod = bytesread;
 			}
-			send_message(client_fd, from,buffer, bytesmod);
+			for (int i = 0; i < 3; ++i) {
+				sent_status = send_message(client_fd, from,buffer, bytesmod);
+				if(sent_status != 0){
+					break;
+				}
+			}
+			if(sent_status == 0){
+				printf("Client timeout\n");
+				return -1;
+			}
+			if(sent_status == -2){
+				printf("Client reset the connection\n");
+				reply_to_rst(client_fd,from);
+				return -3;
+			}
+			if(sent_status == -3){
+				return -3;
+			}
+
 			bytesread = read(data_fd, buffer, BUFSIZE);
 		}
 	}
@@ -203,10 +221,19 @@ int main (int argc, char **argv)
 		}
 		//printf("HELO SUCCESS");
 		stream_status = stream_data(fd,from,from_len);
-		if(stream_status < 0){
+		if(stream_status == -1){
 			/*perror("Error streaming to %s", inet_ntoa(from.sin_addr));*/
-			fprintf(stderr, "Error streaming to %s\n", strerror(errno));
+			fprintf(stderr, "Error streaming to client\n");
 			initiate_rst(fd,from);
+			break;
+		}
+		if(stream_status == -2){
+			reply_to_rst(fd,from);
+			printf("Client shutdown stream\n");
+			break;
+		}
+		if(stream_status == -3){
+			printf("Client shutdown stream\n");
 			break;
 		}
 		if(stream_status == 0){

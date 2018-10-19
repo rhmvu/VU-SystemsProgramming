@@ -37,37 +37,36 @@ void sigint_handler(int sigint)
 	}
 }
 
-int main (int argc, char *argv [])
-{
+int main (int argc, char *argv []) {
 	int server_fd, audio_fd, helo_status, control_status;
-	int* sample_size;
-	int* sample_rate;
-	int* channels;
+	int *sample_size;
+	int *sample_rate;
+	int *channels;
 	client_filterfunc pfunc;
 	struct in_addr *ip;
 	struct sockaddr_in to;
 
-	char* buffer = (char *) allocate_memory(BUFSIZE);
+	char *buffer = (char *) allocate_memory(BUFSIZE);
 
 	sample_size = (int *) allocate_memory(sizeof(int));
 	sample_rate = (int *) allocate_memory(sizeof(int));
 	channels = (int *) allocate_memory(sizeof(int));
 
 
+	printf("SysProg2006 network client\n");
+	printf("handed in by Ruben van der Ham, 2592271\n\n\n");
 
-	printf ("SysProg2006 network client\n");
-	printf ("handed in by Ruben van der Ham, 2592271\n\n\n");
-
-	signal( SIGINT, sigint_handler );	// trap Ctrl^C signals
+	signal(SIGINT, sigint_handler);    // trap Ctrl^C signals
 
 	// parse arguments
-	if (argc < 3){
-		printf ("error : called with incorrect number of parameters\nusage : %s <server_name/IP> <filename> [<filter> [filter_options]]]\n", argv[0]) ;
+	if (argc < 3) {
+		printf("error : called with incorrect number of parameters\nusage : %s <server_name/IP> <filename> [<filter> [filter_options]]]\n",
+			   argv[0]);
 		return -1;
 	}
 
 
-	if(argc<2){
+	if (argc < 2) {
 		printf("Usage: pingclient1 <hostname>\n");
 		return 1;
 	}
@@ -76,119 +75,134 @@ int main (int argc, char *argv [])
 	server_fd = setup_socket();
 
 	to.sin_family = AF_INET;
-	to.sin_port  = htons(DEFAULT_PORT);
+	to.sin_port = htons(DEFAULT_PORT);
 	to.sin_addr = *ip;
 
 	//try to connect to the server 3 times
 	for (int i = 0; i < 3; ++i) {
-		helo_status = setup_helo_connection(server_fd,&to);
-		if(helo_status == 1){
+		helo_status = setup_helo_connection(server_fd, &to);
+		if (helo_status == 1) {
 			break;
 		}
 		sleep(1);
 	}
 	//0 on timeout, -1 on error, 1 on success, 2 on succesfull connection reset
-	if(helo_status == 2){
+	if (helo_status == 2) {
 		printf("Connection reset during helo\n");
 		return -1;
 	}
-	if(helo_status == 0){
+	if (helo_status == 0) {
 		printf("Timeout couldn't reach server\n");
 		return -1;
 	}
-	if(helo_status == -1){
+	if (helo_status == -1) {
 		printf("Error sending HELO message to server\n");
 		return -1;
 	}
 
-	//printf("HELO SUCCESS");
-	control_status = setup_control_message(server_fd,&to,argv[2],argv[3]);
-	if(control_status == -1){
-		initiate_rst(server_fd,&to);
-		return -1;
-	}
-	if(control_status == 2){
-		printf("Server has reset the connection\n");
-		return -1;
-	}
-	if(control_status == 0){
-		printf("Control timeout\n");
-		return -1;
-	}
-
-	printf("CONTROL SUCCESS\n");
-
-	// TO IMPLEMENT
-	// send the requested filename and library information to the server
-	// and wait for an acknowledgement. Or fail if the server returns an errorcode
 	{
 		*sample_size = 4;
 		*sample_rate = 44100;
 		*channels = 2;
 	}
+	//printf("HELO SUCCESS");
+	control_status = setup_control_message(server_fd, &to, argv[2], argv[3],sample_size,sample_rate,channels);
+	if (control_status == -1) {
+		initiate_rst(server_fd, &to);
+		return -1;
+	}
+	if (control_status == 2) {
+		printf("Server has reset the connection\n");
+		return -1;
+	}
+	if (control_status == 0) {
+		printf("Control timeout\n");
+		return -1;
+	}
+
+	printf("CONTROL SUCCESS\n");
+	printf("size:%d\nrate:%d:chanells:%d\n\n",*sample_size,*sample_rate,*channels);
+	// TO IMPLEMENT
+	// send the requested filename and library information to the server
+	// and wait for an acknowledgement. Or fail if the server returns an errorcode
+
 
 	// open output
-	audio_fd = aud_writeinit((int) *sample_rate,(int) *sample_size,(int) *channels);
-	if (audio_fd < 0){
+	audio_fd = aud_writeinit((int) *sample_rate, (int) *sample_size, (int) *channels);
+	if (audio_fd < 0) {
 		printf("error: unable to open audio output.\n");
 		return -1;
 	}
 
 	// open the library on the clientside if one is requested
-	if (argv[3] && strcmp(argv[3],"")){
-		void *mylib = dlopen(argv[3],RTLD_NOW);
+	if (argv[3] && strcmp(argv[3], "")) {
+		void *mylib = dlopen(argv[3], RTLD_NOW);
 
 		// try to open the library, if one is requested
 		pfunc = NULL;
 		//open lib
-		pfunc = dlsym(mylib,"decode");
+		pfunc = dlsym(mylib, "decode");
 
 
-		if (!pfunc){
+		if (!pfunc) {
 			printf("failed to open the requested library. breaking hard\n");
 			return -1;
 		}
-		printf("opened libraryfile %s\n",argv[3]);
-	}
-	else{
+		printf("opened libraryfile %s\n", argv[3]);
+	} else {
 		pfunc = NULL;
 		printf("not using a filter\n");
 	}
 
 	// start receiving data
 
-	int bytesread, bytesmod;
+	int bytesread, bytesmod, audio_status;
+	int wait_time = (int)(*sample_rate/2);
 	bytesmod = 0;
 	bytesread = 0;
-	char *modbuffer;
-	if(pfunc) {
-		 modbuffer = allocate_memory(BUFSIZE);
+	char *modbuffer = 0;
+	if (pfunc) {
+		modbuffer = allocate_memory(BUFSIZE);
 	}
 	printf("retrieving first shitt:\n");
-	bytesread = receive_message(server_fd, &to,buffer, BUFSIZE);
-	while (bytesread > 0) {
-		printf("read 1024 bytes\n");
+	bytesread = receive_message(server_fd, &to, buffer, BUFSIZE);
+	while (bytesread > 0 && !breakloop) {
+		printf("read %d bytes, Audio status %d\n", bytesread,audio_status);
 		// edit data in-place. Not necessarily the best option
-		if (pfunc){
+		if (pfunc) {
 			modbuffer = pfunc(buffer, bytesread, &bytesmod);
-		}else{
+		} else {
 			modbuffer = buffer;
 			bytesmod = bytesread;
 		}
+		usleep(wait_time);
 
-		write(audio_fd, modbuffer, bytesmod);
-		bytesread = receive_message(server_fd, &to,buffer, BUFSIZE);
+		audio_status = write(audio_fd, modbuffer, bytesmod);
+		for (int i = 0; i < 250; ++i) {
+			bytesread = receive_message(server_fd, &to, buffer, BUFSIZE);
+			if(bytesread != 0){
+				break;
+			}
+		}
+
 	}
 
-
+	if(breakloop){
+		initiate_rst(server_fd,&to);
+	} else {
+		printf("DONE");
+	}
 	free(channels);
 	free(sample_rate);
 	free(sample_size);
 	free(ip);
 	free(buffer);
-	free(modbuffer);
-
+	if (modbuffer != NULL && pfunc) {
+		printf("Freeing modbuffer\n");
+		free(modbuffer);
+	}
 	if (audio_fd >= 0)
+		printf("Closing audio descriptor\n");
 		close(audio_fd);
 	if (server_fd >= 0)
 		close(server_fd);
