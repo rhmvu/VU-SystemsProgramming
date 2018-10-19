@@ -82,7 +82,7 @@ int setup_control_message(int fd, struct sockaddr_in *from,char* datafile, char*
         return 2;
     }
 
-    receive_status = receive_message(fd,from,buffer,CONTROL_BUFSIZE); //buffer failure??
+    receive_status = receive_message(fd,from,buffer,CONTROL_BUFSIZE);
     if(receive_status == 0){
         //timeout occured
         return 0;
@@ -95,11 +95,11 @@ int setup_control_message(int fd, struct sockaddr_in *from,char* datafile, char*
         return 2;
     }
 
-    if(strncmp(buffer,PROT_CTRL_ACK,PROT_CTRL_ACK_SIZE)){
-        receive_message(fd,from,buffer,CONTROL_BUFSIZE);
-        //int buff_len = strnlen(buffer,CONTROL_BUFSIZE);
-        //fwrite(buffer,1,buff_len,stdout);
-                printf("%s",buffer);
+    if(strncmp(buffer,PROT_CTRL_ACK,PROT_CTRL_ACK_SIZE)  != 0){
+        //receive_message(fd,from,buffer,CONTROL_BUFSIZE);
+        /*//int buff_len = strnlen(buffer,CONTROL_BUFSIZE);
+        //fwrite(buffer,1,buff_len,stdout);*/
+        printf("%s",buffer);
         return -1;
     }
 
@@ -144,8 +144,28 @@ int handle_control_message(int fd, struct sockaddr_in *from,char* datafile, char
     return 1;
 }
 
+/*
+ * @return: 0 on timeout, -1 on error, 1 success, 2 on successful RST
+ */
+int confirm_control_message(int fd, struct sockaddr_in *from){
+    int sent_status;
+    sent_status = send_message(fd,from,PROT_CTRL_ACK,PROT_CTRL_ACK_SIZE);
 
-//TODO: confirm control message
+    if(sent_status == 0){
+        //timeout occured
+        return 0;
+    }
+    if(sent_status < 0){
+        return -1;
+    }
+    if(sent_status == 2){
+        reply_to_rst(fd,from);
+        return 2;
+    }
+    return 1;
+}
+
+
 
 /*
  * @return: 0 on timeout, -1 on error, 1 on success, 2 on succesfull connection reset
@@ -266,9 +286,9 @@ int initiate_rst(int fd,struct sockaddr_in *from) {
     send_packet(fd,from,PROT_RST,PROT_RST_SIZE);
 
     //receive RST_ACK
-    printf("receiving rstack\n");
+    //printf("receiving rstack\n");
     receive_status = receive_message(fd, from,PROT_RST,PROT_RST_SIZE);
-    printf("received rstack\n");
+    //printf("received rstack\n");
     if(receive_status == 0){
         //timeout occurred
         return 0;

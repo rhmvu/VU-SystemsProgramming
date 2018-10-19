@@ -6,11 +6,11 @@ LDFLAGS = -ldl
 
 ###################### HELPERS
 
-#%.so : %.c
-#	$(CC) $(CFLAGS) -shared -nostdlib -fPIC $+ -o $@
+%.so : %.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -shared -nostdlib -fPIC $+ -o $@
 
-#%.o : %.c
-#	${CC} ${CFLAGS} -c $? -o $@
+%.o : %.c
+	${CC} ${CFLAGS} $(LDFLAGS) -c $? -o $@
 
 ####################### TARGETS
 
@@ -22,12 +22,10 @@ libstream.so : networking.o protocol.o
 	${CC} -shared -o libstream.so networking.o protocol.o
 
 networking.o : networking.c networking.h
-	echo "net"
 	${CC} ${CFLAGS} -c -fPIC networking.c -o networking.o
 
 
 protocol.o: protocol.c protocol.h
-	echo "prot"
 	${CC} ${CFLAGS} -c -fPIC protocol.c -o protocol.o
 
 .PHONY : all clean distclean
@@ -38,7 +36,7 @@ client : client.o audio.o libstream.so
 	${CC} ${CFLAGS} -o $@ $+ -Wl,-rpath=$(shell pwd) -L./ -lstream
 
 server : libstream.so server.o audio.o 
-	${CC} ${CFLAGS} -o $@ $+ -Wl,-rpath=$(shell pwd) -L./ -lstream
+	${CC} ${CFLAGS} -o $@ $+ $(LDFLAGS) -Wl,-rpath=$(shell pwd) -L./ -lstream
 
 distclean : clean
 	rm -f server client *.so

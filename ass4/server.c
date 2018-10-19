@@ -13,6 +13,7 @@
 #include <dlfcn.h>
 #include <signal.h>
 #include <errno.h>
+#include <dlfcn.h>
 
 #include "library.h"
 #include "audio.h"
@@ -63,7 +64,7 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 	data_fd = aud_readinit(datafile, &sample_rate, &sample_size, &channels);
 	if (data_fd < 0){
 		printf("failed to open datafile %s, skipping request\n",datafile);
-		send_message(client_fd,from,"FAIL:datafile",14);
+		send_message(client_fd,from,"FAIL: datafile does not exist",50);
 		initiate_rst(client_fd,from);
 		return -1;
 	}
@@ -71,13 +72,19 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 
 	// optionally open a library
 	if (libfile){
+		void* mylib;
+
+		mylib = dlopen(libfile,RTLD_NOW);
+
 		// try to open the library, if one is requested
 		pfunc = NULL;
 		//open lib
-
+		pfunc = dlsym(mylib,"encode");
 
 		if (!pfunc){
 			printf("failed to open the requested library. breaking hard\n");
+			send_message(client_fd,from,"FAIL: libfile does not exist",50);
+			initiate_rst(client_fd,from);
 			return -1;
 		}
 		printf("opened libraryfile %s\n",libfile);
@@ -173,6 +180,7 @@ int main (int argc, char **argv)
 		if(stream_status < 0){
 			/*perror("Error streaming to %s", inet_ntoa(from.sin_addr));*/
 			fprintf(stderr, "Error streaming to %s\n", strerror(errno));
+			initiate_rst(fd,from);
 			break;
 		}
 		// TO IMPLEMENT: 
