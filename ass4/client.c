@@ -20,7 +20,7 @@
 #include "protocol.h"
 
 
-#define BUFSIZE 1024
+#define BUFSIZE 4096
 
 static int breakloop = 0;	///< use this variable to stop your wait-loop. Occasionally check its value, !1 signals that the program should close
 
@@ -32,7 +32,7 @@ void sigint_handler(int sigint)
 		printf("SIGINT catched. Please wait to let the client close gracefully.\nTo close hard press Ctrl^C again.\n");
 	}
 	else{
-       		printf ("SIGINT occurred, exiting hard... please wait\n");
+		printf ("SIGINT occurred, exiting hard... please wait\n");
 		exit(-1);
 	}
 }
@@ -56,10 +56,10 @@ int main (int argc, char *argv [])
 
 
 	printf ("SysProg2006 network client\n");
-	printf ("handed in by Ruben van der Ham, 2592271\n");
-	
+	printf ("handed in by Ruben van der Ham, 2592271\n\n\n");
+
 	signal( SIGINT, sigint_handler );	// trap Ctrl^C signals
-	
+
 	// parse arguments
 	if (argc < 3){
 		printf ("error : called with incorrect number of parameters\nusage : %s <server_name/IP> <filename> [<filter> [filter_options]]]\n", argv[0]) ;
@@ -120,24 +120,30 @@ int main (int argc, char *argv [])
 
 	// TO IMPLEMENT
 	// send the requested filename and library information to the server
-	// and wait for an acknowledgement. Or fail if the server returns an errorcode	
+	// and wait for an acknowledgement. Or fail if the server returns an errorcode
 	{
 		*sample_size = 4;
 		*sample_rate = 44100;
 		*channels = 2;
 	}
-	
+
 	// open output
 	audio_fd = aud_writeinit((int) *sample_rate,(int) *sample_size,(int) *channels);
 	if (audio_fd < 0){
 		printf("error: unable to open audio output.\n");
 		return -1;
 	}
-	
+
 	// open the library on the clientside if one is requested
 	if (argv[3] && strcmp(argv[3],"")){
+		void *mylib = dlopen(argv[3],RTLD_NOW);
+
 		// try to open the library, if one is requested
 		pfunc = NULL;
+		//open lib
+		pfunc = dlsym(mylib,"decode");
+
+
 		if (!pfunc){
 			printf("failed to open the requested library. breaking hard\n");
 			return -1;
@@ -148,33 +154,45 @@ int main (int argc, char *argv [])
 		pfunc = NULL;
 		printf("not using a filter\n");
 	}
-	
+
 	// start receiving data
-	{
-		int bytesread, bytesmod;
-		char *modbuffer;
-		
-		bytesread = read(server_fd, buffer, BUFSIZE);
-		while (bytesread > 0){
-			// edit data in-place. Not necessarily the best option
-			if (pfunc)
-				modbuffer = pfunc(buffer,bytesread,&bytesmod); 
-			write(audio_fd, modbuffer, bytesmod);
-			bytesread = read(server_fd, buffer, BUFSIZE);
-		}
+
+	int bytesread, bytesmod;
+	bytesmod = 0;
+	bytesread = 0;
+	char *modbuffer;
+	if(pfunc) {
+		 modbuffer = allocate_memory(BUFSIZE);
 	}
+	printf("retrieving first shitt:\n");
+	bytesread = receive_message(server_fd, &to,buffer, BUFSIZE);
+	while (bytesread > 0) {
+		printf("read 1024 bytes\n");
+		// edit data in-place. Not necessarily the best option
+		if (pfunc){
+			modbuffer = pfunc(buffer, bytesread, &bytesmod);
+		}else{
+			modbuffer = buffer;
+			bytesmod = bytesread;
+		}
+
+		write(audio_fd, modbuffer, bytesmod);
+		bytesread = receive_message(server_fd, &to,buffer, BUFSIZE);
+	}
+
 
 	free(channels);
 	free(sample_rate);
 	free(sample_size);
 	free(ip);
 	free(buffer);
+	free(modbuffer);
 
-	if (audio_fd >= 0)	
+	if (audio_fd >= 0)
 		close(audio_fd);
 	if (server_fd >= 0)
 		close(server_fd);
-	
+
 	return 0 ;
 }
 

@@ -33,7 +33,7 @@ protocol.o: protocol.c protocol.h
 all : client server ${LIBS}
 	
 client : client.o audio.o libstream.so
-	${CC} ${CFLAGS} -o $@ $+ -Wl,-rpath=$(shell pwd) -L./ -lstream
+	${CC} ${CFLAGS} -o $@ $+ $(LDFLAGS) -Wl,-rpath=$(shell pwd) -L./ -lstream
 
 server : libstream.so server.o audio.o 
 	${CC} ${CFLAGS} -o $@ $+ $(LDFLAGS) -Wl,-rpath=$(shell pwd) -L./ -lstream

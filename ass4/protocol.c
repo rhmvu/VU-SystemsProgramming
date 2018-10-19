@@ -149,8 +149,12 @@ int handle_control_message(int fd, struct sockaddr_in *from,char* datafile, char
  */
 int confirm_control_message(int fd, struct sockaddr_in *from){
     int sent_status;
-    sent_status = send_message(fd,from,PROT_CTRL_ACK,PROT_CTRL_ACK_SIZE);
-
+    for (int i = 0; i < 3; ++i) {
+        sent_status = send_message(fd, from, PROT_CTRL_ACK, PROT_CTRL_ACK_SIZE);
+        if(sent_status != 0){
+            break;
+        }
+    }
     if(sent_status == 0){
         //timeout occured
         return 0;
@@ -222,7 +226,7 @@ int setup_helo_connection(int fd, struct sockaddr_in * to){
  */
 int handle_helo_connection(int fd, struct sockaddr_in *from){
     int receive_status, sent_status;
-    char *buffer = allocate_memory(HELO_BUFSIZE);
+    char buffer[HELO_BUFSIZE];
 
     receive_status = receive_message(fd, from,(char *) buffer, HELO_BUFSIZE);
     if(receive_status == 0){
@@ -269,7 +273,7 @@ int handle_helo_connection(int fd, struct sockaddr_in *from){
     }
 
     //printf("HELO: Host %s port %d: %s\n", inet_ntoa(from->sin_addr), ntohs(from->sin_port), buffer);
-    free(buffer);
+    //free(buffer);
     return 1;
 
 
@@ -331,14 +335,14 @@ int tokenize_control_message(char* message,char* datafile, char* libfile){
     if(strncmp(token,TOKEN_DATAFILE,TOKEN_SIZE) != 0){
         return -1;
     }
-    datafile = strsep(&message, TOKEN_DELIMITER);
-    printf("File:%s\n",datafile);
+    token = strsep(&message, TOKEN_DELIMITER);
+    snprintf(datafile,TOKEN_SIZE,"%s",token);
     token = strsep(&message, TOKEN_DELIMITER);
     if(strncmp(token,TOKEN_LIBFILE,TOKEN_SIZE) != 0){
         return -1;
     }
-    libfile =  strsep(&message, TOKEN_DELIMITER);
-    printf("library:%s\n",libfile);
+    token =  strsep(&message, TOKEN_DELIMITER);
+    snprintf(libfile,TOKEN_SIZE,"%s",token);
     if(libfile == NULL || datafile == NULL){
         return -1;
     }
@@ -394,7 +398,7 @@ int send_message(int fd, struct sockaddr_in *to, char* buff, int buf_size){
  */
 int receive_message(int fd, struct sockaddr_in *from, char* buff,int buf_size){
     int receive_status, sent_status;
-    char* ack_buffer = allocate_memory(PROT_ACK_SIZE);
+    char ack_buffer[PROT_ACK_SIZE];
 
     receive_status = receive_packet_with_timeout(fd, buf_size,from,(char *) buff);
     //printf("RECEIVED: Host %s port %d: %s\n", inet_ntoa(from->sin_addr), ntohs(from->sin_port), buff);
@@ -434,7 +438,7 @@ int receive_message(int fd, struct sockaddr_in *from, char* buff,int buf_size){
     if(strncmp(ack_buffer,PROT_ACK,PROT_ACK_SIZE) != 0) { //maybe msglength -1?
         return -1;
     }
-    free(ack_buffer);
+    //free(ack_buffer);
     return 1;
 }
 

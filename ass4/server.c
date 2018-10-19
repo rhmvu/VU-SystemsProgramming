@@ -36,9 +36,9 @@ static int breakloop = 0;	///< use this variable to stop your wait-loop. Occasio
 int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 {
 	int data_fd;
-	int channels, sample_size, sample_rate, control_status;
+	int channels, sample_size, sample_rate, control_status, cc_status;
 	server_filterfunc pfunc;
-	char buffer[BUFSIZE];
+	char *buffer = allocate_memory(BUFSIZE);
 	char *datafile = (char*) allocate_memory(FILENAME_SIZE);
 	char *libfile = (char*) allocate_memory(FILENAME_SIZE);
 
@@ -51,6 +51,8 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
         printf("can't parse control packet");
         return -1;
     }
+    printf("File:%s\n",datafile);
+    printf("library:%s\n",libfile);
     /*
 	if(reply_status <0){
     	perror("Error receiving control packet");
@@ -71,7 +73,7 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 	printf("opened datafile %s\n",datafile);
 
 	// optionally open a library
-	if (libfile){
+	if (libfile&& strcmp(libfile,"(null)")){
 		void* mylib;
 
 		mylib = dlopen(libfile,RTLD_NOW);
@@ -93,26 +95,46 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 		pfunc = NULL;
 		printf("not using a filter\n");
 	}
-	
-	// TO IMPLEMENT : optionally return an error code to the client if initialization went wrong
+
+	cc_status = confirm_control_message(client_fd,from);
+	if(cc_status == 0){
+        printf("Client timeout\nConnection reset");
+        initiate_rst(client_fd,from);
+        return -1;
+	}else if(cc_status == -1 ){
+	    fprintf(stderr,"Error conforming control packet\n");
+	    initiate_rst(client_fd,from);
+        return -1;
+	}else if (cc_status == 2){
+	    printf("Client has reset the connection\n");
+	    return 0;
+	}
 	
 	// start streaming
 	{
 		int bytesread, bytesmod;
+		bytesmod = 0;
+		bytesread = 0;
 		
 		bytesread = read(data_fd, buffer, BUFSIZE);
 		while (bytesread > 0){
+            printf("Sent bytes 1024\n");
 			// you might also want to check that the client is still active, whether it wants resends, etc..
 			
 			// edit data in-place. Not necessarily the best option
 			if (pfunc)
-				bytesmod = pfunc(buffer,bytesread); 
-			write(client_fd, buffer, bytesmod);
+				bytesmod = pfunc(buffer,bytesread);
+			else{
+			    bytesmod = bytesread;
+			}
+			send_message(client_fd, from,buffer, bytesmod);
 			bytesread = read(data_fd, buffer, BUFSIZE);
 		}
 	}
 
-	// TO IMPLEMENT : optionally close the connection gracefully 	
+	printf("DONEEEEE!!1\n\n");
+
+	//
 	
 	if (client_fd >= 0)
 		close(client_fd);
@@ -122,6 +144,10 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 		free(datafile);
 	if (libfile)
 		free(libfile);
+	if(buffer){
+	    free(buffer);
+	}
+
 	
 	return 0;
 }
@@ -147,7 +173,7 @@ int main (int argc, char **argv)
 	struct sockaddr_in* from;
 	socklen_t from_len;
 	from_len = sizeof(struct sockaddr_in);
-	from = malloc(from_len);
+	from = allocate_memory(from_len);
 
 	printf ("SysProg network server\n");
 	printf ("handed in by Ruben van der Ham, 2592271\n");
@@ -182,6 +208,11 @@ int main (int argc, char **argv)
 			fprintf(stderr, "Error streaming to %s\n", strerror(errno));
 			initiate_rst(fd,from);
 			break;
+		}
+		if(stream_status == 0){
+		    printf("Done streaming\n\n");
+		    //rst here
+            break;
 		}
 		// TO IMPLEMENT: 
 		// 	wait for connections

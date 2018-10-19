@@ -21,6 +21,7 @@ extern const int DEFAULT_PORT;
 
 int handle_control_message(int fd, struct sockaddr_in *from,char* datafile, char* libfile);
 int setup_control_message(int fd, struct sockaddr_in *from,char* datafile, char* libfile);
+int confirm_control_message(int fd, struct sockaddr_in *from);
 int handle_helo_connection(int fd, struct sockaddr_in *from);
 int setup_helo_connection(int fd, struct sockaddr_in *from);
 int initiate_rst(int fd,struct sockaddr_in *from);
