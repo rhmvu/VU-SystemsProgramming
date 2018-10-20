@@ -105,16 +105,15 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 	
 	// start streaming
 	{
-		int bytesread, bytesmod, sent_status,packet_count;
+		int bytesread, bytesmod, sent_status,packet_count,mod;
 		bytesmod = 0;
 		bytesread = 0;
 		packet_count = 0;
 		
 		bytesread = read(data_fd, buffer, BUFSIZE);
 		while (bytesread > 0 && !breakloop){
-            //printf("%d: Sent bytes\n",packet_count);
 			packet_count++;
-			int mod = packet_count%5;
+			mod = packet_count%5;
 
 			write(1,"\r                 ",16);
 			write(1,"\rStreaming.....",11+mod);
@@ -124,28 +123,25 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 			else{
 			    bytesmod = bytesread;
 			}
-			for (int i = 0; i < 3; ++i) {
+			for (int i = 0; i < 5; ++i) {
 				sent_status = send_message(client_fd, from,buffer, bytesmod);
-				if(sent_status != 0){
+				if(sent_status > 0){
 					break;
 				}
                 if(sent_status == -2){
-                    printf("Client reset the connection\n");
-                    reply_to_rst(client_fd,from);
+                    return -2;
+                }
+                if(sent_status == -3){
                     return -3;
                 }
 			}
 			if(sent_status == 0){
-				printf("\n\nClient timeout\n");
+				printf("\nClient timeout\n");
 				return -1;
 			}
 
-			if(sent_status == -3){
-				return -3;
-			}
 
 			bytesread = read(data_fd, buffer, BUFSIZE);
-			//printf("%d: Sent %d bytes\n",packet_count,bytesread);
 		}
 	}
 
@@ -224,8 +220,6 @@ int main (int argc, char **argv)
 		stream_status = stream_data(fd,from,from_len);
 		if(stream_status == -1){
 			fprintf(stderr, "Error streaming to %s\n\n\n", inet_ntoa(from->sin_addr));
-			initiate_rst(fd,from);
-			//break;
             continue;
 		}
 		if(stream_status == -2){
