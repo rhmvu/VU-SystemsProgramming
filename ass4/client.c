@@ -87,22 +87,36 @@ int connect_to_server(int server_fd,struct sockaddr_in *to, int* sample_rate, in
     return 1;
 }
 
+void free_audio_memory(char* buffer, char* modbuffer,int audio_fd, void* mylib){
+    free(buffer);
+    if (modbuffer != NULL && modbuffer != buffer) {
+        free(modbuffer);
+    }
+    if (audio_fd >= 0) {
+        printf("Closing audio descriptor\n");
+        close(audio_fd);
+    }
+    if(mylib){
+        dlclose(mylib);
+    }
+}
 
 int play_audio(int server_fd,struct sockaddr_in *to,int* sample_rate, int* sample_size, int* channels,char* libfile){
     int audio_fd;
+    void *mylib = 0;
     client_filterfunc pfunc;
     char *buffer = (char *) allocate_memory(BUFSIZE);
     // open output
     audio_fd = aud_writeinit((int) *sample_rate, (int) *sample_size, (int) *channels);
     if (audio_fd < 0) {
         printf("error: unable to open audio output.\n");
-        free(buffer);
+        free_audio_memory(buffer, NULL,audio_fd, mylib);
         return -1;
     }
 
     // open the library on the clientside if one is requested
     if (libfile && strcmp(libfile, "")) {
-        void *mylib = dlopen(libfile, RTLD_NOW);
+        mylib = dlopen(libfile, RTLD_NOW);
 
         // try to open the library, if one is requested
         pfunc = NULL;
@@ -112,6 +126,7 @@ int play_audio(int server_fd,struct sockaddr_in *to,int* sample_rate, int* sampl
 
         if (!pfunc) {
             printf("failed to open the requested library. breaking hard\n");
+            free_audio_memory(buffer, NULL,audio_fd, mylib);
             return -1;
         }
         printf("opened libraryfile %s\n", libfile);
@@ -161,11 +176,11 @@ int play_audio(int server_fd,struct sockaddr_in *to,int* sample_rate, int* sampl
             }
             if(bytesread == -2){
                 reply_to_rst(server_fd,to);
-                free(buffer);
-                return -1;
+                free_audio_memory(buffer, modbuffer,audio_fd, mylib);
+                break;
             }
             if(bytesread == -3){
-                free(buffer);
+                free_audio_memory(buffer, modbuffer,audio_fd, mylib);
                 return -1;
             }
         }
@@ -184,13 +199,7 @@ int play_audio(int server_fd,struct sockaddr_in *to,int* sample_rate, int* sampl
         printf("\nDone streaming!\n");
     }
 
-    free(buffer);
-    if (modbuffer != NULL && pfunc&& modbuffer != buffer) {
-        free(modbuffer);
-    }
-    if (audio_fd >= 0)
-        printf("Closing audio descriptor\n");
-    close(audio_fd);
+    free_audio_memory(buffer, modbuffer,audio_fd, mylib);
     return 1;
 }
 
@@ -203,9 +212,7 @@ int main (int argc, char *argv []) {
 	int status = -1;
 	struct in_addr *ip;
 	struct sockaddr_in *to = allocate_memory(sizeof(struct sockaddr_in));
-
-
-
+	
 	sample_size = (int *) allocate_memory(sizeof(int));
 	sample_rate = (int *) allocate_memory(sizeof(int));
 	channels = (int *) allocate_memory(sizeof(int));

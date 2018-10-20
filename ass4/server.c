@@ -181,11 +181,7 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
             }
         }
 	}
-
-
     free_stream_memory(data_fd,datafile,libfile,buffer,mylib);
-
-	
 	return 0;
 }
 
