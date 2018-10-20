@@ -42,27 +42,18 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 	char *datafile = (char*) allocate_memory(FILENAME_SIZE);
 	char *libfile = (char*) allocate_memory(FILENAME_SIZE);
 
-	// TO IMPLEMENT
-	// receive a control packet from the client 
-	// containing at the least the name of the file to stream and the library to use
-	printf("getting control packet\n");
+	//get control packet
+
+	//printf("getting control packet\n");
     control_status = handle_control_message(client_fd,from,datafile,libfile);
     if(control_status <0){
         printf("can't parse control packet");
         return -1;
     }
-    printf("File:%s\n",datafile);
-    printf("library:%s\n",libfile);
-    /*
-	if(reply_status <0){
-    	perror("Error receiving control packet");
-		return -1;
-	}*/
+    //printf("File:%s\n",datafile);
+    //printf("library:%s\n",libfile);
 
-		/*datafile = strdup("example.wav");
-		libfile = NULL;*/
-	
-	// open input
+	//try to open the audio file
 	data_fd = aud_readinit(datafile, &sample_rate, &sample_size, &channels);
 	if (data_fd < 0){
 		printf("failed to open datafile %s, skipping request\n",datafile);
@@ -70,7 +61,7 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 		initiate_rst(client_fd,from);
 		return -1;
 	}
-	printf("opened datafile %s\n",datafile);
+	//printf("opened datafile %s\n",datafile);
 
 	// optionally open a library
 	if (libfile&& strcmp(libfile,"(null)")){
@@ -96,6 +87,8 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 		printf("not using a filter\n");
 	}
 
+	//confirm everything went fine
+
 	cc_status = confirm_control_message(client_fd,from,sample_size,sample_rate,channels);
 	if(cc_status == 0){
         printf("Client timeout\nConnection reset");
@@ -112,16 +105,20 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 	
 	// start streaming
 	{
-		int bytesread, bytesmod, sent_status;
+		int bytesread, bytesmod, sent_status,packet_count;
 		bytesmod = 0;
 		bytesread = 0;
+		packet_count = 0;
 		
 		bytesread = read(data_fd, buffer, BUFSIZE);
-		while (bytesread > 0){
-            printf("Sent bytes 1024\n");
-			// you might also want to check that the client is still active, whether it wants resends, etc..
-			
-			// edit data in-place. Not necessarily the best option
+		while (bytesread > 0 && !breakloop){
+            //printf("%d: Sent bytes\n",packet_count);
+			packet_count++;
+			int mod = packet_count%5;
+
+			write(1,"\r                 ",16);
+			write(1,"\rStreaming.....",11+mod);
+
 			if (pfunc)
 				bytesmod = pfunc(buffer,bytesread);
 			else{
@@ -132,30 +129,30 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 				if(sent_status != 0){
 					break;
 				}
+                if(sent_status == -2){
+                    printf("Client reset the connection\n");
+                    reply_to_rst(client_fd,from);
+                    return -3;
+                }
 			}
 			if(sent_status == 0){
-				printf("Client timeout\n");
+				printf("\n\nClient timeout\n");
 				return -1;
 			}
-			if(sent_status == -2){
-				printf("Client reset the connection\n");
-				reply_to_rst(client_fd,from);
-				return -3;
-			}
+
 			if(sent_status == -3){
 				return -3;
 			}
 
 			bytesread = read(data_fd, buffer, BUFSIZE);
+			//printf("%d: Sent %d bytes\n",packet_count,bytesread);
 		}
 	}
 
-	printf("DONEEEEE!!1\n\n");
+	if(breakloop){
+		//initiate_rst(client_fd,from);
+	}
 
-	//
-	
-	if (client_fd >= 0)
-		close(client_fd);
 	if (data_fd >= 0)
 		close(data_fd);
 	if (datafile)
@@ -178,7 +175,7 @@ void sigint_handler(int sigint)
 		printf("SIGINT catched. Please wait to let the server close gracefully.\nTo close hard press Ctrl^C again.\n");
 	}
 	else{
-       		printf ("SIGINT occurred, exiting hard... please wait\n");
+		printf ("SIGINT occurred, exiting hard... please wait\n");
 		exit(-1);
 	}
 }
@@ -187,7 +184,6 @@ void sigint_handler(int sigint)
 int main (int argc, char **argv)
 {
 	int fd, close_status, stream_status, helo_status,rst_status;
-	/*char buffer[BUFSIZE];*/
 	struct sockaddr_in* from;
 	socklen_t from_len;
 	from_len = sizeof(struct sockaddr_in);
@@ -208,24 +204,29 @@ int main (int argc, char **argv)
 	while (!breakloop){
 		//printf("In loop\n");
 		helo_status = handle_helo_connection(fd,from);
-		if(helo_status == -1){
+
+		if(helo_status == -1 && ntohs(from->sin_port)!=0){
 			//on timeout ACK packet or error: reset connection
 			for (int i = 0; i < 3 && rst_status !=1; ++i) {
 				rst_status = initiate_rst(fd,from);
 			}
+            continue;
 		} else if(helo_status ==2){
 			//on connection successful reset:
 			continue;
 		} else if(helo_status == 0){
 			continue;
+		} else if(helo_status == -1 && ntohs(from->sin_port)==0 && breakloop){ //port is 0 and loop broken, no client seen so no RST sent
+			break;
 		}
-		//printf("HELO SUCCESS");
+
+		printf("Setting up new stream:\n");
 		stream_status = stream_data(fd,from,from_len);
 		if(stream_status == -1){
-			/*perror("Error streaming to %s", inet_ntoa(from.sin_addr));*/
-			fprintf(stderr, "Error streaming to client\n");
+			fprintf(stderr, "Error streaming to %s\n\n\n", inet_ntoa(from->sin_addr));
 			initiate_rst(fd,from);
-			break;
+			//break;
+            continue;
 		}
 		if(stream_status == -2){
 			reply_to_rst(fd,from);
@@ -237,13 +238,11 @@ int main (int argc, char **argv)
 			break;
 		}
 		if(stream_status == 0){
-		    printf("Done streaming\n\n");
-		    //rst here
-            break;
+		    printf("\nDone streaming\n\n");
+		    initiate_rst(fd,from);
+            continue;
 		}
-		// TO IMPLEMENT: 
-		// 	wait for connections
-		// 	when a client connects, start streaming data (see the stream_data(...) prototype above)
+
 		sleep(1);
 	}
 	close_status = close(fd);

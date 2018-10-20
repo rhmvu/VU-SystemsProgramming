@@ -310,32 +310,25 @@ int handle_helo_connection(int fd, struct sockaddr_in *from){
 
     receive_status = receive_message(fd, from,(char *) buffer, HELO_BUFSIZE);
     if(receive_status == 0){
-       //timeout occured
+       //timeout occurred
         return 0;
     }
     if(receive_status == -2){
-        //printf("Server replying to RST during HELO");
         reply_to_rst(fd,from);
         return 2;
     }
     if(receive_status < 0){
-        //printf("HELO RECEICVE FAILE\n\n");
         return -1;
     }
-   // printf("RECEIVED, during helo: Host %s port %d: %s\n", inet_ntoa(from->sin_addr), ntohs(from->sin_port), buffer    );
-
     if(strncmp(buffer,PROT_HELO,HELO_BUFSIZE) != 0 ){ //maybe msglength -1?
-        //printf("string cmp error");
         return -1;
     }
 
-    //printf("RECEIVED DURING HANDLE HELO: Host %s port %d: %s\n", inet_ntoa(from->sin_addr), ntohs(from->sin_port), buffer);
 
     //send HELO back
     sent_status = send_message(fd,from,PROT_HELO,PROT_HELO_SIZE);
-    //printf("SENT HELO BACK!");
     if(sent_status == 0){
-        //timeout occured
+        //timeout occurred
         return 0;
     }
     if(sent_status < 0){
@@ -346,14 +339,11 @@ int handle_helo_connection(int fd, struct sockaddr_in *from){
         return 2;
     }
 
-    //printf("SUCCELFUL\n");
 
     if(strncmp(buffer,PROT_HELO,PROT_HELO_SIZE) != 0){ //maybe msglength -1?
         return -1;
     }
 
-    //printf("HELO: Host %s port %d: %s\n", inet_ntoa(from->sin_addr), ntohs(from->sin_port), buffer);
-    //free(buffer);
     return 1;
 
 
@@ -364,30 +354,28 @@ int handle_helo_connection(int fd, struct sockaddr_in *from){
  */
 int initiate_rst(int fd,struct sockaddr_in *from) {
     int receive_status;
-    //char buffer[HELO_BUFSIZE];
-    //int msg_length;
+    char buffer[HELO_BUFSIZE];
     //send RST
+    printf("INIT RST...\n");
     send_packet(fd,from,PROT_RST,PROT_RST_SIZE);
 
     //receive RST_ACK
-    //printf("receiving rstack\n");
-    receive_status = receive_message(fd, from,PROT_RST,PROT_RST_SIZE);
+    printf("receiving rstack..\n");
+    receive_status = receive_message(fd, from,buffer,PROT_RST_ACK_SIZE);
     //printf("received rstack\n");
     if(receive_status == 0){
         //timeout occurred
         return 0;
     }
     if(receive_status == -2){
+        printf("receiving -2");
         reply_to_rst(fd,from);
     }
     if(receive_status != -3){
+        printf("RST INIT FAILED\n");
         return -1;
     }
-    /*msg_length = strnlen(buffer,HELO_BUFSIZE);
-
-    if(!strncmp(buffer,PROT_RST_ACK_,msg_length)){ //maybe msglength -1?
-        return -1;
-    }*/
+    printf("SUCCESSFULL RST!\n");
     return 1;
 }
 
@@ -397,13 +385,13 @@ int initiate_rst(int fd,struct sockaddr_in *from) {
  */
 
 int reply_to_rst(int fd,struct sockaddr_in *from){
+    printf("REPLYING TO RSTK ACK\n");
     int sent_status = send_message(fd,from,PROT_RST_ACK,PROT_RST_ACK_SIZE);
     if(sent_status  != 1){
         return -1;
     }
     return 1;
 }
-
 
 /*
  *@return: -1 failed, 1 success
@@ -463,7 +451,6 @@ int send_message(int fd, struct sockaddr_in *to, char* buff, int buf_size){
     if(sent_status != buf_size){
         return -1;
     }
-    //printf("SENT: %s\n", buff);
 
     //receive first ack
     receive_status = receive_packet_with_timeout(fd, PROT_ACK_SIZE, to,ack_buffer);
@@ -510,7 +497,7 @@ int receive_message(int fd, struct sockaddr_in *from, char* buff,int buf_size){
 
     original_rcv_bytes = 0;
     receive_status = receive_packet_with_timeout(fd, buf_size,from,(char *) buff);
-    //printf("RECEIVED: Host %s port %d: %s\n", inet_ntoa(from->sin_addr), ntohs(from->sin_port), buff);
+
     if(receive_status == 0){
         //timeout occurred
         return 0;
@@ -518,7 +505,7 @@ int receive_message(int fd, struct sockaddr_in *from, char* buff,int buf_size){
     if(receive_status < 0){
         return -1;
     }
-    //printf("RECEIVED: Host %s port %d: %s\n", inet_ntoa(from->sin_addr), ntohs(from->sin_port), buff    );
+
     if(!strncmp(buff,PROT_RST,PROT_RST_SIZE)){
         printf("RST DETECTED\n");
         return -2;
@@ -532,7 +519,7 @@ int receive_message(int fd, struct sockaddr_in *from, char* buff,int buf_size){
 
     //send first ack
     sent_status = send_packet(fd, from,PROT_ACK,PROT_ACK_SIZE);
-    //printf("FIRST ACK SENT\n");
+
     if(sent_status < PROT_ACK_SIZE){
         //printf("sent failure");
         return -1;
@@ -542,14 +529,12 @@ int receive_message(int fd, struct sockaddr_in *from, char* buff,int buf_size){
     receive_status = receive_packet_with_timeout(fd, PROT_ACK_SIZE, from,ack_buffer);
     if(receive_status == 0){
         //timeout occurred
-        //printf("TIMEOUT BITCH\n");
         return -1;
     }
-    //printf("RECEIVED: Host %s port %d: %s\n", inet_ntoa(from->sin_addr), ntohs(from->sin_port), buff    );
     if(strncmp(ack_buffer,PROT_ACK,PROT_ACK_SIZE) != 0) { //maybe msglength -1?
         return -1;
     }
-    //free(ack_buffer);
+
     return original_rcv_bytes;
 }
 
@@ -559,7 +544,7 @@ void *allocate_memory(size_t size){
         perror("Couldn't allocate memory");
         exit(1);
     }
-    memset(status,0,size);
+    //memset(status,0,size);
     return status;
 }
 

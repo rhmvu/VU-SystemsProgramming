@@ -122,10 +122,6 @@ int main (int argc, char *argv []) {
 
 	printf("CONTROL SUCCESS\n");
 	printf("size:%d\nrate:%d:chanells:%d\n\n",*sample_size,*sample_rate,*channels);
-	// TO IMPLEMENT
-	// send the requested filename and library information to the server
-	// and wait for an acknowledgement. Or fail if the server returns an errorcode
-
 
 	// open output
 	audio_fd = aud_writeinit((int) *sample_rate, (int) *sample_size, (int) *channels);
@@ -154,20 +150,30 @@ int main (int argc, char *argv []) {
 		printf("not using a filter\n");
 	}
 
+
 	// start receiving data
 
-	int bytesread, bytesmod, audio_status;
-	int wait_time = (int)(*sample_rate/2);
-	bytesmod = 0;
-	bytesread = 0;
+	//int mod;
+	int wait_time = (int)(*sample_rate/ *channels);
+	int bytesmod = 0;
+	int bytesread = 0;
+	int packet_count = 0;
 	char *modbuffer = 0;
 	if (pfunc) {
 		modbuffer = allocate_memory(BUFSIZE);
 	}
-	printf("retrieving first shitt:\n");
+
+
 	bytesread = receive_message(server_fd, &to, buffer, BUFSIZE);
 	while (bytesread > 0 && !breakloop) {
-		printf("read %d bytes, Audio status %d\n", bytesread,audio_status);
+		packet_count++;
+		//mod = packet_count%5;
+
+		//write(1,"\r               ",14);
+		//write(1,"\rPlaying.....",9+mod);
+
+
+		//printf("read %d bytes, Audio status %d\n", bytesread,audio_status);
 		// edit data in-place. Not necessarily the best option
 		if (pfunc) {
 			modbuffer = pfunc(buffer, bytesread, &bytesmod);
@@ -177,11 +183,18 @@ int main (int argc, char *argv []) {
 		}
 		usleep(wait_time);
 
-		audio_status = write(audio_fd, modbuffer, bytesmod);
-		for (int i = 0; i < 250; ++i) {
+		write(audio_fd, modbuffer, bytesmod);
+		for (int i = 0; i < 3; ++i) {
 			bytesread = receive_message(server_fd, &to, buffer, BUFSIZE);
-			if(bytesread != 0){
+			if(bytesread > 0){
 				break;
+			}
+			if(bytesread == -2){
+			    reply_to_rst(server_fd,&to);
+                return -1;
+			}
+			if(bytesread == -3){
+                return -1;
 			}
 		}
 
@@ -197,8 +210,7 @@ int main (int argc, char *argv []) {
 	free(sample_size);
 	free(ip);
 	free(buffer);
-	if (modbuffer != NULL && pfunc) {
-		printf("Freeing modbuffer\n");
+	if (modbuffer != NULL && pfunc&& modbuffer != buffer) {
 		free(modbuffer);
 	}
 	if (audio_fd >= 0)
