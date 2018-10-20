@@ -96,6 +96,7 @@ int play_audio(int server_fd,struct sockaddr_in *to,int* sample_rate, int* sampl
     audio_fd = aud_writeinit((int) *sample_rate, (int) *sample_size, (int) *channels);
     if (audio_fd < 0) {
         printf("error: unable to open audio output.\n");
+        free(buffer);
         return -1;
     }
 
@@ -160,9 +161,11 @@ int play_audio(int server_fd,struct sockaddr_in *to,int* sample_rate, int* sampl
             }
             if(bytesread == -2){
                 reply_to_rst(server_fd,to);
+                free(buffer);
                 return -1;
             }
             if(bytesread == -3){
+                free(buffer);
                 return -1;
             }
         }
@@ -190,9 +193,6 @@ int play_audio(int server_fd,struct sockaddr_in *to,int* sample_rate, int* sampl
     close(audio_fd);
     return 1;
 }
-
-
-
 
 
 int main (int argc, char *argv []) {

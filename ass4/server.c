@@ -27,6 +27,25 @@
 
 static int breakloop = 0;	///< use this variable to stop your wait-loop. Occasionally check its value, !1 signals that the program should close
 
+
+
+
+void free_stream_memory(int data_fd,char* datafile,char* libfile,char* buffer,void* mylib){
+    if (datafile)
+        free(datafile);
+    if (libfile)
+        free(libfile);
+    if(buffer){
+        free(buffer);
+    }
+    if(data_fd){
+        close(data_fd);
+    }
+    if(mylib){
+        dlclose(mylib);
+    }
+}
+
 /// stream data to a client. 
 ///
 /// This is an example function; you do *not* have to use this and can choose a different flow of control
@@ -35,8 +54,9 @@ static int breakloop = 0;	///< use this variable to stop your wait-loop. Occasio
 /// @return returns 0 on success or a negative errorcode on failure
 int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 {
-	int data_fd;
+	int data_fd = 0;
 	int channels, sample_size, sample_rate, control_status, cc_status;
+    void* mylib = 0;
 	server_filterfunc pfunc;
 	char *buffer = allocate_memory(BUFSIZE);
 	char *datafile = (char*) allocate_memory(FILENAME_SIZE);
@@ -48,6 +68,7 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
     control_status = handle_control_message(client_fd,from,datafile,libfile);
     if(control_status <0){
         printf("can't parse control packet");
+        free_stream_memory(data_fd,datafile,libfile,buffer,mylib);
         return -1;
     }
     //printf("File:%s\n",datafile);
@@ -59,13 +80,14 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 		printf("failed to open datafile %s, skipping request\n",datafile);
 		send_message(client_fd,from,"FAIL: datafile does not exist",50);
 		initiate_rst(client_fd,from);
+        free_stream_memory(data_fd,datafile,libfile,buffer,mylib);
 		return -1;
 	}
 	//printf("opened datafile %s\n",datafile);
 
-	// optionally open a library
+
+    // optionally open a library
 	if (libfile&& strcmp(libfile,"(null)")){
-		void* mylib;
 
 		mylib = dlopen(libfile,RTLD_NOW);
 
@@ -78,7 +100,8 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 			printf("failed to open the requested library. breaking hard\n");
 			send_message(client_fd,from,"FAIL: libfile does not exist",50);
 			initiate_rst(client_fd,from);
-			return -1;
+            free_stream_memory(data_fd,datafile,libfile,buffer,mylib);
+            return -1;
 		}
 		printf("opened libraryfile %s\n",libfile);
 	}
@@ -92,14 +115,17 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 	cc_status = confirm_control_message(client_fd,from,sample_size,sample_rate,channels);
 	if(cc_status == 0){
         printf("Client timeout\nConnection reset");
+        free_stream_memory(data_fd,datafile,libfile,buffer,mylib);
         initiate_rst(client_fd,from);
         return -1;
 	}else if(cc_status == -1 ){
 	    fprintf(stderr,"Error conforming control packet\n");
+        free_stream_memory(data_fd,datafile,libfile,buffer,mylib);
 	    initiate_rst(client_fd,from);
         return -1;
 	}else if (cc_status == 2){
 	    printf("Client has reset the connection\n");
+        free_stream_memory(data_fd,datafile,libfile,buffer,mylib);
 	    return 0;
 	}
 	
@@ -129,39 +155,40 @@ int stream_data(int client_fd, struct sockaddr_in *from, size_t fromlen)
 					break;
 				}
                 if(sent_status == -2){
+                    free_stream_memory(data_fd,datafile,libfile,buffer,mylib);
                     return -2;
                 }
                 if(sent_status == -3){
+                    free_stream_memory(data_fd,datafile,libfile,buffer,mylib);
                     return -3;
                 }
 			}
 			if(sent_status == 0){
 				printf("\nClient timeout\n");
+                free_stream_memory(data_fd,datafile,libfile,buffer,mylib);
 				return -1;
 			}
-
-
 			bytesread = read(data_fd, buffer, BUFSIZE);
 		}
 	}
 
 	if(breakloop){
-		//initiate_rst(client_fd,from);
+        int rst_status;
+        for (int i = 0; i < 3; ++i) {
+            rst_status = initiate_rst(client_fd,from);
+            if(rst_status == 1){
+                break;
+            }
+        }
 	}
 
-	if (data_fd >= 0)
-		close(data_fd);
-	if (datafile)
-		free(datafile);
-	if (libfile)
-		free(libfile);
-	if(buffer){
-	    free(buffer);
-	}
+
+    free_stream_memory(data_fd,datafile,libfile,buffer,mylib);
 
 	
 	return 0;
 }
+
 
 /// unimportant: the signal handler. This function gets called when Ctrl^C is pressed
 void sigint_handler(int sigint)
@@ -244,6 +271,7 @@ int main (int argc, char **argv)
 		perror("Couldn't close filedescriptor");
 	}
 	free(from);
+
 	printf("server closed\n");
 
 	return 0;
