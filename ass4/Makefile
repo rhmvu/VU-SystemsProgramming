@@ -22,13 +22,13 @@ LIBS = libblank.so
 
 .PHONY : all clean distclean
 
-all : client server ${LIBS}
+all : audioclient audioserver ${LIBS}
 	
-client : audioclient.o audio.o libstream.so
-	${CC} ${CFLAGS} -o $@ $+ $(LDFLAGS) -Wl,-rpath=$(shell pwd) -L./ -lstream
+audioclient : audioclient.o audio.o libstream.so
+	${CC} ${CFLAGS} -o audioclient $+ $(LDFLAGS) -Wl,-rpath=$(shell pwd) -L./ -lstream
 
-server : libstream.so audioserver.o audio.o 
-	${CC} ${CFLAGS} -o $@ $+ $(LDFLAGS) -Wl,-rpath=$(shell pwd) -L./ -lstream
+audioserver : libstream.so audioserver.o audio.o 
+	${CC} ${CFLAGS} -o audioserver $+ $(LDFLAGS) -Wl,-rpath=$(shell pwd) -L./ -lstream
 
 libstream.so : networking.o protocol.o
 	${CC} -shared -o libstream.so networking.o protocol.o

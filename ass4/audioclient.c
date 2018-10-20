@@ -89,16 +89,16 @@ int connect_to_server(int server_fd,struct sockaddr_in *to, int* sample_rate, in
 
 void free_audio_memory(char* buffer, char* modbuffer,int audio_fd, void* mylib){
     free(buffer);
-    /*if (modbuffer != NULL && modbuffer != buffer&& !mylib) {
+    if (modbuffer != NULL && modbuffer != buffer&& !mylib) {
         free(modbuffer);
-    }*/
+    }
     if (audio_fd >= 0) {
         printf("Closing audio descriptor\n");
         close(audio_fd);
     }
-    /*if(mylib){
+    if(mylib){
         dlclose(mylib);
-    }*/
+    }
 }
 
 int play_audio(int server_fd,struct sockaddr_in *to,int* sample_rate, int* sample_size, int* channels,char* libfile){
@@ -176,7 +176,6 @@ int play_audio(int server_fd,struct sockaddr_in *to,int* sample_rate, int* sampl
             }
             if(bytesread == -2){
                 reply_to_rst(server_fd,to);
-                free_audio_memory(buffer, modbuffer,audio_fd, mylib);
                 break;
             }
             if(bytesread == -3){
@@ -237,7 +236,6 @@ int main (int argc, char *argv []) {
     to->sin_addr = *ip;
 
     if(connect_to_server(server_fd,to,sample_rate,sample_size,channels,argv[2],argv[3]) == 1){
-        printf("Play audio\n");
         if(play_audio(server_fd,to,sample_rate,sample_size,channels,argv[3])==1){
             status = 0;
         }
