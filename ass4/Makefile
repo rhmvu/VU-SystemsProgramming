@@ -18,6 +18,18 @@ LDFLAGS = -ldl
 LIBS = libblank.so
 
 #main lib containing program code
+
+
+.PHONY : all clean distclean
+
+all : client server ${LIBS}
+	
+client : audioclient.o audio.o libstream.so
+	${CC} ${CFLAGS} -o $@ $+ $(LDFLAGS) -Wl,-rpath=$(shell pwd) -L./ -lstream
+
+server : libstream.so audioserver.o audio.o 
+	${CC} ${CFLAGS} -o $@ $+ $(LDFLAGS) -Wl,-rpath=$(shell pwd) -L./ -lstream
+
 libstream.so : networking.o protocol.o
 	${CC} -shared -o libstream.so networking.o protocol.o
 
@@ -28,18 +40,8 @@ networking.o : networking.c networking.h
 protocol.o: protocol.c protocol.h
 	${CC} ${CFLAGS} -c -fPIC protocol.c -o protocol.o
 
-.PHONY : all clean distclean
-
-all : client server ${LIBS}
-	
-client : client.o audio.o libstream.so
-	${CC} ${CFLAGS} -o $@ $+ $(LDFLAGS) -Wl,-rpath=$(shell pwd) -L./ -lstream
-
-server : libstream.so server.o audio.o 
-	${CC} ${CFLAGS} -o $@ $+ $(LDFLAGS) -Wl,-rpath=$(shell pwd) -L./ -lstream
-
 distclean : clean
-	rm -f server client *.so
+	rm -f audioserver audioclient *.so
 clean:
-	rm -f $(OBJECTS) server client *.o *.so *~
+	rm -f $(OBJECTS) audioserver audioclient *.o *.so *~
 

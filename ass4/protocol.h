@@ -12,9 +12,6 @@
 #include <stdlib.h>
 #include <sys/types.h>
 
-extern const int CONTROL_FAIL_DATAFILE;
-extern const int CONTROL_FAIL_LIBRARY;
-extern const int CONTROL_FAIL_GENERIC;
 extern const int DEFAULT_PORT;
 
 

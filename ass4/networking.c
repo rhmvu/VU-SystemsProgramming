@@ -64,7 +64,6 @@ int send_packet(int fd,struct sockaddr_in *to,char *buff, int msg_length){
     int sent_length;
     socklen_t to_len;
     to_len = sizeof(*to);
-    //printf("Host %s port %d: %s\n", inet_ntoa(to->sin_addr), ntohs(to->sin_port), buff);
 
     //send the packet
     sent_length = sendto(fd, buff, msg_length, 0,(struct sockaddr *) to, to_len);
