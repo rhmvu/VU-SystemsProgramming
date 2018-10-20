@@ -1,6 +1,7 @@
 ass*/README
 *.tar
 */test/*
+*.wav
 
 
 # Prerequisites
