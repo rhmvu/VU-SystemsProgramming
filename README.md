@@ -1,6 +1,6 @@
 ## VU - Systems Programming
 
-During this course one will learn about syscalls, memory management in the C language.
+During this course one will learn about syscalls, memory management and gain programming experience in the C language.
 
 | Assignment     | Grade          |
 | :------------- | :------------- |
