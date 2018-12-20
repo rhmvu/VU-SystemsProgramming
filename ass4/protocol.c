@@ -123,7 +123,7 @@ int setup_control_message(int fd, struct sockaddr_in *from,char* datafile, char*
     }
 
     if(strncmp(buffer,PROT_CTRL_ACK,PROT_CTRL_ACK_SIZE)  != 0){
-        printf("%s",buffer);
+        printf("%s\n",buffer);
         free(buffer);
         return -1;
     }

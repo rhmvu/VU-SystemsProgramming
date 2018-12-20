@@ -67,7 +67,6 @@ int connect_to_server(int server_fd,struct sockaddr_in *to, int* sample_rate, in
         *sample_rate = 44100;
         *channels = 2;
     }
-    //printf("HELO SUCCESS");
     control_status = setup_control_message(server_fd, to, audiofile, libfile,sample_size,sample_rate,channels);
     if (control_status == -1) {
         initiate_rst(server_fd, to);
@@ -81,9 +80,6 @@ int connect_to_server(int server_fd,struct sockaddr_in *to, int* sample_rate, in
         printf("Control timeout\n");
         return -1;
     }
-
-    /* printf("CONTROL SUCCESS\n");
-     printf("size:%d\nrate:%d:chanells:%d\n\n",*sample_size,*sample_rate,*channels);*/
     return 1;
 }
 
@@ -134,7 +130,7 @@ int play_audio(int server_fd,struct sockaddr_in *to,int* sample_rate, int* sampl
         pfunc = NULL;
         printf("not using a filter\n");
     }
-
+    //printf("Using smaple size:%d\n",*sample_size);
 
     // start receiving data
 
